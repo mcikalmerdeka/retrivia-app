@@ -52,4 +52,4 @@ src/
 
 ## License
 
-ISC 
+ISC
