@@ -2,6 +2,10 @@
 
 A modern web application for creating Instagram Story-sized photo collages. Built with Next.js, TypeScript, and Tailwind CSS.
 
+## Live Demo
+
+Try the application online: [https://photobooth-web-app.vercel.app/](https://photobooth-web-app.vercel.app/)
+
 ## Features
 
 - Take 3 photos using your device's camera
@@ -41,15 +45,35 @@ A modern web application for creating Instagram Story-sized photo collages. Buil
 ## Project Structure
 
 ```
-src/
-├── app/                    # Next.js app router pages
-├── components/            # React components
-│   ├── photobooth/       # Photobooth-specific components
-│   └── ui/               # Shared UI components
-├── lib/                   # Utility functions
-└── types/                # TypeScript type definitions
+Photobooth Web App/
+├── .git/                   # Git repository
+├── .next/                  # Next.js build output
+├── node_modules/           # Dependencies
+├── src/                    # Source code
+│   ├── app/                # Next.js app router pages
+│   │   ├── page.tsx        # Home page
+│   │   ├── photobooth/     # Photobooth page
+│   │   └── upload/         # Upload page
+│   ├── components/         # React components
+│   │   ├── photobooth/     # Photobooth-specific components
+│   │   │   ├── CaptionComponent.tsx
+│   │   │   ├── FilterComponent.tsx
+│   │   │   ├── FrameComponent.tsx
+│   │   │   ├── PhotoboothComponent.tsx
+│   │   │   ├── PhotoStripComponent.tsx
+│   │   │   └── UploadComponent.tsx
+│   │   ├── upload/         # Upload-specific components
+│   │   │   └── UploadComponent.tsx
+│   │   └── ui/             # Shared UI components
+│   ├── lib/                # Utility functions
+│   │   └── utils/          # Utility functions
+│   │       └── photo.ts    # Photo manipulation utilities
+│   └── types/              # TypeScript type definitions
+├── .env                    # Environment variables
+├── .eslintrc.json          # ESLint configuration
+├── next.config.js          # Next.js configuration
+├── package.json            # Dependencies and scripts
+├── postcss.config.js       # PostCSS configuration
+├── tailwind.config.js      # Tailwind CSS configuration
+└── tsconfig.json           # TypeScript configuration
 ```
-
-## License
-
-ISC
