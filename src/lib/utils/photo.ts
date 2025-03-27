@@ -4,7 +4,7 @@ export const createPhotoFromFile = (file: File): Promise<Photo> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = (e) => {
-      if (e.target?.result) {
+      if (e.target && e.target.result) {
         resolve({
           id: Date.now(),
           dataUrl: e.target.result as string

@@ -10,24 +10,23 @@ export default function UploadComponent() {
   const [photos, setPhotos] = useState<Photo[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (files && photos.length + files.length <= 3) {
-      Array.from(files).forEach(file => {
-        if (file.type.startsWith('image/')) {
-          const reader = new FileReader()
-          reader.onload = (e) => {
-            if (e.target?.result) {
-              setPhotos(prev => [...prev, {
-                id: Date.now(),
-                dataUrl: e.target.result as string
-              }])
-            }
-          }
-          reader.readAsDataURL(file)
-        }
-      })
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target || !e.target.files || e.target.files.length === 0) return
+    
+    const file = e.target.files[0]
+    const reader = new FileReader()
+    
+    reader.onload = (e: ProgressEvent<FileReader>) => {
+      const target = e.target as FileReader;
+      if (target && target.result) {
+        setPhotos(prev => [...prev, {
+          id: Date.now(),
+          dataUrl: target.result as string
+        }])
+      }
     }
+    
+    reader.readAsDataURL(file)
   }
 
   const removePhoto = (id: number) => {
@@ -71,7 +70,7 @@ export default function UploadComponent() {
         type="file"
         accept="image/*"
         multiple
-        onChange={handleFileSelect}
+        onChange={handleFileChange}
         className="hidden"
       />
 

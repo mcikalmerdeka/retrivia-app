@@ -7,7 +7,7 @@ import FrameComponent, { FrameType } from '../photobooth/FrameComponent'
 import CaptionComponent, { FontStyle } from '../photobooth/CaptionComponent'
 import PhotoStripComponent from '../photobooth/PhotoStripComponent'
 
-// Extend HTMLCanvasElement to include our custom property
+// Extend HTMLCanvasElement to include finalizeCrop method
 declare global {
   interface HTMLCanvasElement {
     finalizeCrop?: () => void;
@@ -404,7 +404,13 @@ export default function UploadComponent() {
   const readFileAsDataURL = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
+      reader.onload = (e) => {
+        if (reader.result) {
+          resolve(reader.result as string)
+        } else {
+          reject(new Error('Failed to read file'))
+        }
+      }
       reader.onerror = reject
       reader.readAsDataURL(file)
     })
