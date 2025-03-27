@@ -1,0 +1,136 @@
+### **Comprehensive Prompt Guide for a Photobooth-Style Web Application**  
+**Objective**: Create a user-friendly web app that allows users to (1) take 3 timed photos and design a customizable collage card or (2) upload existing photos to create a similar card. Final outputs are downloadable as Instagram Story-sized PNGs.
+
+---
+
+### **1. Core Features Overview**
+#### **Feature 1: Photobooth Mode**  
+- **Process**: Take 3 photos → Customize collage layout → Add caption → Download/Retake.  
+- **Key Components**:  
+  - Timer before each photo.  
+  - Collage editor with positional controls (top/middle/bottom).  
+  - Caption field at the card’s bottom.  
+  - Download as PNG (1080x1920 pixels, Instagram Story size).  
+
+#### **Feature 2: Library Upload Mode**  
+- **Process**: Upload 3 photos → Customize collage layout → Add caption → Download/Edit.  
+- **Key Components**:  
+  - Photo upload from device/library.  
+  - Same collage editor and caption tools as Feature 1.  
+
+---
+
+### **2. Step-by-Step User Flow**  
+#### **Photobooth Mode**  
+1. **Photo Capture**  
+   - **Step 1**: User clicks "Start Photobooth."  
+   - **Step 2**: Timer (3-5 seconds) starts before each photo.  
+     - *UI Prompt*: “Get ready! Photo 1/2/3 in [timer]…”  
+   - **Step 3**: After 3 photos, previews appear in a grid.  
+     - *Option*: “Retake All” or “Continue to Collage.”  
+
+2. **Collage Customization**  
+   - **Step 1**: Drag-and-drop or select positions (top/middle/bottom) for each photo.  
+     - *UI Prompt*: “Drag photos to position them. Tap to assign: Top/Middle/Bottom.”  
+   - **Step 2**: Adjust photo size/zoom within their assigned section.  
+   - **Step 3**: Click “Next” to proceed.  
+
+3. **Caption & Finalize**  
+   - **Step 1**: Add text at the bottom of the card.  
+     - *UI Prompt*: “Write a caption (max 50 characters).”  
+   - **Step 2**: Preview the card with caption.  
+   - **Step 3**: Choose:  
+     - **Download**: Saves as “card_username_date.png” (1080x1920px).  
+     - **Retake**: Resets to Photo Capture step.  
+
+---
+
+#### **Library Upload Mode**  
+1. **Photo Selection**  
+   - **Step 1**: User clicks “Upload Photos.”  
+   - **Step 2**: Select 3 images from device/library.  
+     - *Validation*: Ensure images are JPG/PNG, under 5MB.  
+   - **Step 3**: Click “Create Collage” to proceed.  
+
+2. **Collage Customization & Caption**  
+   - Same workflow as **Photobooth Mode**.  
+
+3. **Finalize**  
+   - **Download**: Same as above.  
+   - **Edit**: Return to collage editor.  
+
+---
+
+### **3. Technical Requirements**  
+#### **Frontend**  
+- **Camera Access**: Use `getUserMedia` API for photobooth mode.  
+- **Image Processing**:  
+  - Collage rendering via HTML5 Canvas or CSS Grid.  
+  - Client-side resizing/cropping (e.g., with Cropper.js).  
+- **Download**: Convert Canvas to PNG using `toDataURL()`.  
+
+#### **Backend (Optional)**  
+- **Storage**: Temporarily store images if processing is server-side.  
+- **Caching**: Cache user progress locally (e.g., IndexedDB).  
+
+#### **Responsive Design**  
+- Optimize for mobile-first use (vertical layout for Instagram Story sizing).  
+
+---
+
+### **4. UI/UX Guidelines**  
+- **Visual Clarity**:  
+  - Highlight selected photo positions (e.g., borders/animations).  
+  - Preview the Instagram Story aspect ratio during editing.  
+- **Accessibility**:  
+  - Alt text for images.  
+  - Keyboard navigation for drag-and-drop.  
+- **Error Handling**:  
+  - “Retake Photo” for blurry/unusable images.  
+  - “Invalid File” alerts for non-image uploads.  
+
+---
+
+### **5. Optional Enhancements**  
+1. **Templates**: Pre-designed layouts (e.g., grids, polaroid frames).  
+2. **Filters/Stickers**: Add overlays or color filters to photos.  
+3. **Social Sharing**: Direct upload to Instagram/Stories.  
+4. **QR Code**: Generate a shareable link to the card.  
+
+---
+
+### **6. Example Prompts**  
+- **Photobooth Start**: “Smile! Photo 1 of 3 in 3… 2… 1… 📸”  
+- **Collage Editor**: “Arrange your memories! Drag photos to top, middle, or bottom.”  
+- **Caption**: “Add a witty caption to complete your card! 🖊️”  
+- **Download**: “Your Insta Story is ready! 🎉 Download or share now.”  
+
+======================================================================================
+======================================================================================
+
+Tech Stack For the project:
+
+- **Programming Language**: TypeScript
+- **Framework**: Next.js (v15.2.0)
+- **React**: v18.3.1
+- **Styling**: 
+  - Tailwind CSS (v3.4.1)
+  - tailwindcss-animate for animations
+  - Custom color theming with vintage theme colors
+- **UI Components**: shadcn/ui (based on components.json)
+- **Component Library**: 
+  - Lucide React for icons
+  - class-variance-authority for component variants
+  - clsx and tailwind-merge for class conditionals
+- **Build & Development**:
+  - ESLint for linting
+  - TurboPack (based on dev script)
+- **Application Structure**:
+  - React Server Components (RSC enabled)
+  - App Router architecture (src/app directory)
+- **Deployment**: 
+  - Vercel
+- **Package Manager**: 
+  - Both npm (package-lock.json) and Bun (bun.lock) files present
+
+This project follows a modern Next.js architecture with the App Router pattern, uses TypeScript for type safety, and employs shadcn/ui components styled with Tailwind CSS.
