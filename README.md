@@ -1,0 +1,1 @@
+# photobooth-web-app
