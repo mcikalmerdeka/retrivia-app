@@ -2,6 +2,10 @@
 /node_modules
 /.pnp
 .pnp.js
+# Ignore all image files
+*.jpg
+*.jpeg
+*.png
 
 # testing
 /coverage
