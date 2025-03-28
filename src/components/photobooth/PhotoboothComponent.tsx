@@ -159,7 +159,7 @@ export default function PhotoboothComponent() {
       const video = videoRef.current
       
       // Match dimensions to what PhotoStripComponent expects
-      const canvasWidth = 450 * 0.85 // photoWidth from PhotoStripComponent
+      const canvasWidth = 450 * 0.85 // photoWidth from PhotoStripComponent (original dimension)
       const canvasHeight = canvasWidth * 0.6 // photoHeight from PhotoStripComponent
       
       // Set canvas to the desired aspect ratio
@@ -229,7 +229,7 @@ export default function PhotoboothComponent() {
           ctx.fill()
         }
         
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+        const dataUrl = canvas.toDataURL('image/jpeg', 1.0) // Use maximum quality
         const newId = `photo-${photoIdCounter.current++}`
         
         // Use functional update to ensure we're working with the latest state

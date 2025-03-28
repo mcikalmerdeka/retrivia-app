@@ -91,7 +91,7 @@ export default function UploadComponent() {
     if (!ctx) return
     
     // Get the cropped image data
-    const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.9)
+    const croppedDataUrl = canvas.toDataURL('image/jpeg', 1.0) // Use maximum quality
     
     // Process the cropped image
     try {
@@ -136,7 +136,7 @@ export default function UploadComponent() {
         }
         
         // Set canvas size to match individual photo dimensions in PhotoStripComponent
-        const canvasWidth = 450 * 0.85 // photoWidth from PhotoStripComponent
+        const canvasWidth = 450 * 0.85 // photoWidth from PhotoStripComponent (original dimension)
         const canvasHeight = canvasWidth * 0.6 // photoHeight from PhotoStripComponent
         
         canvas.width = canvasWidth
@@ -176,7 +176,7 @@ export default function UploadComponent() {
           ctx.fill()
         }
         
-        resolve(canvas.toDataURL('image/jpeg', 0.9))
+        resolve(canvas.toDataURL('image/jpeg', 1.0)) // Use maximum quality
       }
       
       img.src = dataUrl
@@ -338,8 +338,8 @@ export default function UploadComponent() {
       // Create a new canvas for the cropped area
       const cropCanvas = document.createElement('canvas')
       
-      // Match dimensions to what PhotoStripComponent expects
-      const canvasWidth = 450 * 0.85 // photoWidth from PhotoStripComponent
+      // Match dimensions to what PhotoStripComponent expects, but at original resolution
+      const canvasWidth = 450 * 0.85 // photoWidth from PhotoStripComponent (original dimension)
       const canvasHeight = canvasWidth * 0.6 // photoHeight from PhotoStripComponent
       
       cropCanvas.width = canvasWidth

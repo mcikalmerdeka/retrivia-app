@@ -137,8 +137,8 @@ export default function PhotoStripComponent({
     if (!ctx) return
 
     // Use 9:16 aspect ratio (smartphone aspect ratio)
-    canvas.width = 450
-    canvas.height = 800
+    canvas.width = 450  // Reverted to original dimension
+    canvas.height = 800  // Reverted to original dimension
 
     // Fill background with vintage paper color
     ctx.fillStyle = '#f9f5e7' // Vintage paper background
@@ -395,7 +395,7 @@ export default function PhotoStripComponent({
     const link = document.createElement('a')
     const timestamp = new Date().toISOString().replace(/:/g, '-')
     link.download = `retrivia-memory-${timestamp}.jpg`
-    link.href = canvasRef.current.toDataURL('image/jpeg', 0.8)
+    link.href = canvasRef.current.toDataURL('image/jpeg', 1.0) // Use maximum quality
     link.click()
   }
 

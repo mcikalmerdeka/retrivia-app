@@ -26,7 +26,7 @@ export const createPhotoFromVideo = (video: HTMLVideoElement): Photo => {
   
   return {
     id: Date.now(),
-    dataUrl: canvas.toDataURL('image/jpeg')
+    dataUrl: canvas.toDataURL('image/jpeg', 1.0)
   }
 }
 
