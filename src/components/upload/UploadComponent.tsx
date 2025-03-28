@@ -135,9 +135,12 @@ export default function UploadComponent() {
           return
         }
         
-        // Set canvas size to the target dimensions (matching PhotoStripComponent)
-        canvas.width = 800
-        canvas.height = 533 // 3:2 aspect ratio
+        // Set canvas size to match individual photo dimensions in PhotoStripComponent
+        const canvasWidth = 450 * 0.85 // photoWidth from PhotoStripComponent
+        const canvasHeight = canvasWidth * 0.6 // photoHeight from PhotoStripComponent
+        
+        canvas.width = canvasWidth
+        canvas.height = canvasHeight
         
         // Draw the image on the canvas
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
@@ -203,15 +206,16 @@ export default function UploadComponent() {
       canvas.width = img.width
       canvas.height = img.height
       
-      // Calculate initial crop area (centered, 3:2 aspect ratio)
-      const targetAspect = 3/2
+      // Calculate initial crop area with PhotoStripComponent aspect ratio
+      // In PhotoStripComponent: photoWidth = canvas.width * 0.85, photoHeight = photoWidth * 0.6
+      const targetAspect = 1 / 0.6 // Width to height ratio (matches PhotoStripComponent)
       
       if (img.width / img.height > targetAspect) {
-        // Image is wider than 3:2
+        // Image is wider than target aspect ratio
         cropHeight = img.height * 0.9
         cropWidth = cropHeight * targetAspect
       } else {
-        // Image is taller than 3:2
+        // Image is taller than target aspect ratio
         cropWidth = img.width * 0.9
         cropHeight = cropWidth / targetAspect
       }
@@ -333,8 +337,13 @@ export default function UploadComponent() {
       
       // Create a new canvas for the cropped area
       const cropCanvas = document.createElement('canvas')
-      cropCanvas.width = 800 // Match PhotoStripComponent expected width
-      cropCanvas.height = 533 // 3:2 aspect ratio
+      
+      // Match dimensions to what PhotoStripComponent expects
+      const canvasWidth = 450 * 0.85 // photoWidth from PhotoStripComponent
+      const canvasHeight = canvasWidth * 0.6 // photoHeight from PhotoStripComponent
+      
+      cropCanvas.width = canvasWidth
+      cropCanvas.height = canvasHeight
       
       const cropCtx = cropCanvas.getContext('2d')
       if (!cropCtx) return
@@ -446,7 +455,7 @@ export default function UploadComponent() {
             Crop Your Photo
           </h2>
           <p className="text-center text-gray-700">
-            Drag to position photo inside the frame. The final photo will have a 3:2 aspect ratio.
+            Drag to position your photo. The aspect ratio matches the photostrip frames exactly.
           </p>
           <div className="relative max-w-full overflow-hidden border-[15px] border-[#222222]">
             <canvas 
