@@ -1,6 +1,8 @@
 # Retrivia
 
-A nostalgic web application for capturing and reliving special moments. Retrivia helps you create photostrips with captions, add memorial notes to preserve your feelings, and easily retrieve past memories through a semantic search. Built with Next.js, TypeScript, and Tailwind CSS.
+- Retrivia comes from "Retrieve" (bringing back past moments) with a touch of nostalgia. The web application allows users to create memorable photostrips of special moments and add personal memorial notes to preserve the emotions and context of each memory. In the future, a semantic search feature will make it easy to find and relive these moments based on the content of your memorial notes. 
+
+- Built with Next.js, TypeScript, and Tailwind CSS.
 
 ## Features
 
@@ -74,7 +76,3 @@ Retrivia/
 ├── tailwind.config.js      # Tailwind CSS configuration
 └── tsconfig.json           # TypeScript configuration
 ```
-
-## About Retrivia
-
-Retrivia comes from "Retrieve" (bringing back past moments) with a touch of nostalgia. The application allows users to create memorable photostrips of special moments and add personal memorial notes to preserve the emotions and context of each memory. In the future, a semantic search feature will make it easy to find and relive these moments based on the content of your memorial notes.
