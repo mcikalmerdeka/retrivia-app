@@ -158,38 +158,43 @@ export default function PhotoboothComponent() {
       const canvas = document.createElement('canvas')
       const video = videoRef.current
       
-      // Set canvas dimensions based on orientation
-      if (isPortrait) {
-        canvas.width = video.videoHeight
-        canvas.height = video.videoWidth
-      } else {
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
-      }
+      // Match dimensions to what PhotoStripComponent expects
+      const canvasWidth = 450 * 0.85 // photoWidth from PhotoStripComponent
+      const canvasHeight = canvasWidth * 0.6 // photoHeight from PhotoStripComponent
+      
+      // Set canvas to the desired aspect ratio
+      canvas.width = canvasWidth
+      canvas.height = canvasHeight
       
       const ctx = canvas.getContext('2d')
       
       if (ctx) {
-        // Draw the video frame with proper orientation and mirroring
-        if (isPortrait) {
-          // For portrait: rotate and mirror
-          ctx.translate(canvas.width, 0)
-          ctx.rotate(90 * Math.PI / 180)
-          
-          // First apply mirror effect
-          ctx.scale(-1, 1)
-          ctx.drawImage(video, -canvas.height, 0, canvas.height, canvas.width)
-          
-          // Reset transformations
-          ctx.scale(-1, 1)
-          ctx.rotate(-90 * Math.PI / 180)
-          ctx.translate(-canvas.width, 0)
+        // Calculate how to center and crop video to match desired aspect ratio (1:0.6)
+        const videoAspect = video.videoWidth / video.videoHeight
+        const targetAspect = canvasWidth / canvasHeight // Same as 1 / 0.6
+        
+        let srcX = 0, srcY = 0, srcWidth = video.videoWidth, srcHeight = video.videoHeight
+        
+        // Crop video to match target aspect ratio
+        if (videoAspect > targetAspect) {
+          // Video is wider than target, crop sides
+          srcWidth = video.videoHeight * targetAspect
+          srcX = (video.videoWidth - srcWidth) / 2
         } else {
-          // For landscape: just mirror horizontally to match preview
-          ctx.scale(-1, 1) // Mirror horizontally
-          ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height)
-          ctx.scale(-1, 1) // Reset mirroring
+          // Video is taller than target, crop top/bottom
+          srcHeight = video.videoWidth / targetAspect
+          srcY = (video.videoHeight - srcHeight) / 2
         }
+        
+        // For selfie view, we need to mirror horizontally
+        ctx.save()
+        ctx.scale(-1, 1) // Mirror horizontally
+        ctx.drawImage(
+          video,
+          srcX, srcY, srcWidth, srcHeight, // Source coordinates
+          -canvasWidth, 0, canvasWidth, canvasHeight // Destination coordinates (negative x for mirroring)
+        )
+        ctx.restore()
         
         // Only apply effects if not using 'raw' filter
         if (selectedFilter !== 'raw') {

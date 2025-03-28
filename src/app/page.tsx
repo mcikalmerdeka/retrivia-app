@@ -9,8 +9,9 @@ export default function Home() {
           Retrivia
         </h1>
         <p className="text-lg text-vintage-text max-w-2xl mx-auto">
-          Capture and relive your special moments. Create beautiful photostrips with captions and 
-          preserve the emotion of each memory with personal notes.
+          Transform fleeting moments into timeless treasures
+          <br />
+          Retrivia crafts your memories into photostrips that tell your unique story
         </p>
       </div>
 
@@ -22,7 +23,7 @@ export default function Home() {
               Capture Moments
             </h2>
             <p className="text-vintage-text">
-              Use your camera to take a series of photos and create a nostalgic photostrip with your own memory notes.
+              Use your camera to take a series of photos
             </p>
           </div>
         </Link>
@@ -34,7 +35,7 @@ export default function Home() {
               Upload Memories
             </h2>
             <p className="text-vintage-text">
-              Upload existing photos to create a personalized photostrip and add memorial notes to preserve your feelings.
+              Upload existing photos from your device
             </p>
           </div>
         </Link>
