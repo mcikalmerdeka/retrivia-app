@@ -86,7 +86,7 @@ export default function PhotoboothComponent() {
           if (videoRef.current) {
             videoRef.current.play()
               .then(() => {
-                setCaptureMessage("Press the button when you're ready")
+                setCaptureMessage("Capture your moment when you're ready")
               })
               .catch(error => {
                 console.error('Error playing video:', error)
@@ -127,7 +127,7 @@ export default function PhotoboothComponent() {
 
   // Start countdown for a specific photo in the sequence
   const startCountdownForPhoto = (photoIndex: number) => {
-    setCaptureMessage(`Get ready for photo ${photoIndex + 1} of 3`)
+    setCaptureMessage(`Get ready to capture memory ${photoIndex + 1} of 3`)
     setCountdown(3)
     
     // Use fixed time intervals with clearTimeout for more consistent timing
@@ -351,7 +351,7 @@ export default function PhotoboothComponent() {
               <div key={photo.id} className={`relative ${isPortrait ? 'aspect-[9/16]' : 'aspect-[16/9]'} border-4 border-vintage-sepia`}>
                 <img
                   src={photo.dataUrl}
-                  alt={`Photo ${index + 1}`}
+                  alt={`Memory ${index + 1}`}
                   className="w-full h-full object-cover"
                 />
                 {!isCapturing && (
@@ -385,14 +385,14 @@ export default function PhotoboothComponent() {
                 className="vintage-button flex items-center gap-2 disabled:opacity-50"
               >
                 <Camera className="w-5 h-5" />
-                Take Photos
+                Capture Memories
               </button>
             ) : photos.filter(photo => photo !== null).length === 3 && !isCapturing ? (
               <button 
                 onClick={() => setShowCustomization(true)}
                 className="vintage-button"
               >
-                Customize Photostrip
+                Create Nostalgic Photostrip
               </button>
             ) : (
               <button 
@@ -400,7 +400,7 @@ export default function PhotoboothComponent() {
                 className="vintage-button opacity-50 flex items-center gap-2"
               >
                 <Timer className="w-5 h-5 animate-spin" />
-                Taking Photos...
+                Capturing Memories...
               </button>
             )}
             

@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useRef, useEffect } from 'react'
-import { Download, Share2 } from 'lucide-react'
+import React, { useRef, useEffect, useState } from 'react'
+import { Download, Share2, MessageSquare } from 'lucide-react'
 import { FilterType } from './FilterComponent'
 import { FrameType } from './FrameComponent'
 import { FontStyle } from './CaptionComponent'
@@ -29,6 +29,9 @@ export default function PhotoStripComponent({
   textColor
 }: PhotoStripComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [memorialMessage, setMemorialMessage] = useState<string>('')
+  const [showMessageModal, setShowMessageModal] = useState<boolean>(false)
+  const [savedMessages, setSavedMessages] = useState<{message: string, date: string}[]>([])
 
   // Re-render the photostrip when props change
   useEffect(() => {
@@ -391,9 +394,25 @@ export default function PhotoStripComponent({
     // Create a temporary link element
     const link = document.createElement('a')
     const timestamp = new Date().toISOString().replace(/:/g, '-')
-    link.download = `vintage-photostrip-${timestamp}.jpg`
+    link.download = `retrivia-memory-${timestamp}.jpg`
     link.href = canvasRef.current.toDataURL('image/jpeg', 0.8)
     link.click()
+  }
+
+  const saveMemorialMessage = () => {
+    if (!memorialMessage.trim()) return
+    
+    const newMessage = {
+      message: memorialMessage,
+      date: new Date().toISOString()
+    }
+    
+    setSavedMessages([...savedMessages, newMessage])
+    setMemorialMessage('')
+    setShowMessageModal(false)
+    
+    // In a real application, you would save this to a database
+    console.log('Memorial message saved:', newMessage)
   }
 
   return (
@@ -414,6 +433,14 @@ export default function PhotoStripComponent({
         </button>
         
         <button 
+          onClick={() => setShowMessageModal(true)}
+          className="vintage-button flex items-center gap-2"
+        >
+          <MessageSquare className="w-4 h-4" />
+          Add Memory Note
+        </button>
+        
+        <button 
           onClick={() => alert('Sharing coming soon!')}
           className="px-6 py-3 border border-vintage-primary text-vintage-primary rounded-lg flex items-center gap-2"
         >
@@ -421,6 +448,57 @@ export default function PhotoStripComponent({
           Share
         </button>
       </div>
+      
+      {/* Memorial Message Modal */}
+      {showMessageModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-vintage-paper border-4 border-vintage-sepia rounded p-6 max-w-lg w-full">
+            <h3 className="text-2xl font-vintage text-vintage-sepia mb-4">Preserve This Memory</h3>
+            <p className="text-vintage-text mb-4">
+              Write a message about this moment to preserve your feelings and help you remember it later.
+            </p>
+            
+            <textarea
+              value={memorialMessage}
+              onChange={(e) => setMemorialMessage(e.target.value)}
+              className="w-full h-40 p-3 border-2 border-vintage-sepia bg-vintage-paper rounded"
+              placeholder="What makes this moment special? How do you feel right now?"
+            />
+            
+            <div className="flex justify-end gap-3 mt-4">
+              <button 
+                onClick={() => setShowMessageModal(false)}
+                className="px-4 py-2 border border-vintage-sepia text-vintage-sepia rounded"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={saveMemorialMessage}
+                className="px-4 py-2 bg-vintage-sepia text-white rounded"
+              >
+                Save Memory
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Display saved messages */}
+      {savedMessages.length > 0 && (
+        <div className="mt-6 w-full max-w-lg">
+          <h3 className="text-xl font-vintage text-vintage-sepia mb-2">Your Memory Notes</h3>
+          <div className="border-2 border-vintage-sepia rounded p-4 bg-vintage-paper">
+            {savedMessages.map((msg, index) => (
+              <div key={index} className="mb-4 pb-4 border-b border-vintage-sepia last:border-b-0">
+                <p className="italic text-vintage-text">{msg.message}</p>
+                <p className="text-xs text-right text-vintage-sepia mt-1">
+                  {new Date(msg.date).toLocaleString()}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 } 

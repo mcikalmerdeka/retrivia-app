@@ -6,11 +6,11 @@ export default function Home() {
     <main className="min-h-screen flex flex-col items-center py-12 px-4 film-grain">
       <div className="text-center mb-12">
         <h1 className="text-4xl md:text-5xl font-vintage text-vintage-sepia mb-4">
-          Vintage Photobooth
+          Retrivia
         </h1>
         <p className="text-lg text-vintage-text max-w-2xl mx-auto">
-          Create beautiful vintage-style photo strips to capture your memories.
-          Choose from two different modes to get started.
+          Capture and relive your special moments. Create beautiful photostrips with captions and 
+          preserve the emotion of each memory with personal notes.
         </p>
       </div>
 
@@ -19,10 +19,10 @@ export default function Home() {
           <div className="border-4 border-vintage-sepia p-6 rounded-lg bg-vintage-paper hover:shadow-lg transition-all duration-300 h-full flex flex-col items-center text-center">
             <Camera className="w-16 h-16 text-vintage-sepia mb-4" />
             <h2 className="text-2xl font-vintage text-vintage-sepia mb-2">
-              Take Photos
+              Capture Moments
             </h2>
             <p className="text-vintage-text">
-              Use your camera to take a series of photos and create a vintage-style photo strip.
+              Use your camera to take a series of photos and create a nostalgic photostrip with your own memory notes.
             </p>
           </div>
         </Link>
@@ -31,10 +31,10 @@ export default function Home() {
           <div className="border-4 border-vintage-sepia p-6 rounded-lg bg-vintage-paper hover:shadow-lg transition-all duration-300 h-full flex flex-col items-center text-center">
             <Upload className="w-16 h-16 text-vintage-sepia mb-4" />
             <h2 className="text-2xl font-vintage text-vintage-sepia mb-2">
-              Upload Photos
+              Upload Memories
             </h2>
             <p className="text-vintage-text">
-              Upload your existing photos to create a personalized vintage photo strip.
+              Upload existing photos to create a personalized photostrip and add memorial notes to preserve your feelings.
             </p>
           </div>
         </Link>

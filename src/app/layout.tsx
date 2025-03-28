@@ -7,8 +7,8 @@ import Link from 'next/link'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Vintage Photobooth',
-  description: 'Create beautiful vintage-style photo strips to capture your memories',
+  title: 'Retrivia',
+  description: 'Capture and relive nostalgic moments with photostrips and memory notes',
 }
 
 export default function RootLayout({
@@ -26,7 +26,7 @@ export default function RootLayout({
               className="flex items-center justify-center md:justify-start"
             >
               <span className="text-2xl font-vintage text-vintage-sepia">
-                Vintage Photobooth
+                Retrivia
               </span>
             </Link>
           </div>
@@ -37,10 +37,10 @@ export default function RootLayout({
         <footer className="bg-vintage-paper border-t-4 border-vintage-sepia py-6 mt-12">
           <div className="container mx-auto px-4 text-center">
             <p className="text-vintage-text">
-              &copy; {new Date().getFullYear()} Vintage Photobooth App. All rights reserved.
+              &copy; {new Date().getFullYear()} Retrivia. All rights reserved.
             </p>
             <p className="text-sm text-vintage-text mt-2">
-              Created with love for capturing memories in a vintage style.
+              Created with love for capturing and reliving nostalgic moments.
             </p>
           </div>
         </footer>

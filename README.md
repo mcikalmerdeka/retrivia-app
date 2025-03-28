@@ -1,18 +1,16 @@
-# Photobooth Web App
+# Retrivia
 
-A modern web application for creating Instagram Story-sized photo collages. Built with Next.js, TypeScript, and Tailwind CSS.
-
-## Live Demo
-
-Try the application online: [https://photobooth-web-app.vercel.app/](https://photobooth-web-app.vercel.app/)
+A nostalgic web application for capturing and reliving special moments. Retrivia helps you create photostrips with captions, add memorial notes to preserve your feelings, and easily retrieve past memories through a semantic search. Built with Next.js, TypeScript, and Tailwind CSS.
 
 ## Features
 
 - Take 3 photos using your device's camera
 - Upload 3 photos from your device
-- Create beautiful collages
-- Download photos in Instagram Story size (1080x1920)
-- Vintage-inspired design
+- Add custom captions to your photostrips
+- Create a dated photostrip that displays the current date
+- Add memorial notes to preserve the feelings and context of each moment
+- Save and revisit your memories with a semantic search feature (coming soon)
+- Download high-quality photostrips with your memorial notes
 
 ## Tech Stack
 
@@ -20,7 +18,6 @@ Try the application online: [https://photobooth-web-app.vercel.app/](https://pho
 - React 18.3.1
 - TypeScript
 - Tailwind CSS
-- shadcn/ui components
 
 ## Getting Started
 
@@ -45,7 +42,7 @@ Try the application online: [https://photobooth-web-app.vercel.app/](https://pho
 ## Project Structure
 
 ```
-Photobooth Web App/
+Retrivia/
 ├── .git/                   # Git repository
 ├── .next/                  # Next.js build output
 ├── node_modules/           # Dependencies
@@ -77,3 +74,7 @@ Photobooth Web App/
 ├── tailwind.config.js      # Tailwind CSS configuration
 └── tsconfig.json           # TypeScript configuration
 ```
+
+## About Retrivia
+
+Retrivia comes from "Retrieve" (bringing back past moments) with a touch of nostalgia. The application allows users to create memorable photostrips of special moments and add personal memorial notes to preserve the emotions and context of each memory. In the future, a semantic search feature will make it easy to find and relive these moments based on the content of your memorial notes.
