@@ -280,9 +280,9 @@ export default function PhotoStripComponent({
 
         // Add the date at the bottom to match example
         const today = new Date()
-        const formattedDate = today.toLocaleDateString('en-US', {
-          month: 'long',
+        const formattedDate = today.toLocaleDateString('en-GB', {
           day: 'numeric',
+          month: 'long',
           year: 'numeric'
         })
         
