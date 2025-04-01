@@ -511,4 +511,7 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
   )
 })
 
+// Set display name for the component to fix the ESLint error
+PhotoStripComponent.displayName = 'PhotoStripComponent'
+
 export default PhotoStripComponent 
