@@ -1,28 +1,49 @@
 import { createClient } from '@supabase/supabase-js'
 
+// Check if we're running on the client side
+const isBrowser = typeof window !== 'undefined'
+
 // Get environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
-// Log environment variables for debugging (only display part of the key for security)
-console.log('Supabase URL:', supabaseUrl)
-console.log('Supabase Key (first 5 chars):', supabaseAnonKey.substring(0, 5) + '...')
+// Only log in browser environment to avoid build errors
+if (isBrowser) {
+  // Log environment variables for debugging (only display part of the key for security)
+  console.log('Supabase URL:', supabaseUrl)
+  console.log('Supabase Key (first 5 chars):', supabaseAnonKey ? supabaseAnonKey.substring(0, 5) + '...' : 'missing')
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables')
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('Missing Supabase environment variables')
+  }
 }
 
-// Create client with automatic retries and more conservative settings
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: false, // Don't persist the session in browser storage
-    autoRefreshToken: false, // Don't automatically refresh the token
-  },
-  global: {
-    fetch: (...args) => fetch(...args), // Use the browser's fetch
-    headers: { 'X-Client-Info': 'photobooth-app' }, // Add custom header for tracking
-  },
-})
+// Create a dummy client for SSR if environment variables are missing
+export const supabase = (!supabaseUrl || !supabaseAnonKey) && !isBrowser
+  ? {
+      // Provide dummy implementations that won't break SSR
+      storage: {
+        from: () => ({
+          upload: async () => ({ data: null, error: new Error('Supabase not initialized') }),
+          getPublicUrl: () => ({ data: { publicUrl: '' } }),
+        }),
+      },
+      from: () => ({
+        select: () => ({ data: null, error: new Error('Supabase not initialized') }),
+        insert: () => ({ data: null, error: new Error('Supabase not initialized') }),
+        update: () => ({ data: null, error: new Error('Supabase not initialized') }),
+      }),
+    } as any
+  : createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false, // Don't persist the session in browser storage
+        autoRefreshToken: false, // Don't automatically refresh the token
+      },
+      global: {
+        fetch: (...args) => fetch(...args), // Use the browser's fetch
+        headers: { 'X-Client-Info': 'photobooth-app' }, // Add custom header for tracking
+      },
+    })
 
 // Test function to check database connectivity - call this from a component
 export const testDatabaseConnection = async () => {
