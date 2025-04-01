@@ -1,11 +1,12 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Upload, X, ImagePlus } from 'lucide-react'
+import { Upload, X, ImagePlus, Save } from 'lucide-react'
 import FilterComponent, { FilterType } from '../photobooth/FilterComponent'
 import FrameComponent, { FrameType } from '../photobooth/FrameComponent'
 import CaptionComponent, { FontStyle } from '../photobooth/CaptionComponent'
 import PhotoStripComponent from '../photobooth/PhotoStripComponent'
+import { savePhotoStripSession, uploadBase64Image } from '@/lib/supabase'
 
 // Extend HTMLCanvasElement to include finalizeCrop method
 declare global {
@@ -37,11 +38,15 @@ export default function UploadComponent() {
   const [currentCropImage, setCurrentCropImage] = useState<string | null>(null)
   const [croppedImages, setCroppedImages] = useState<{[key: string]: string}>({})
   const [tempPhotoId, setTempPhotoId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState<boolean | null>(null)
+  const [savedUrl, setSavedUrl] = useState<string | null>(null)
   
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cropCanvasRef = useRef<HTMLCanvasElement>(null)
   const photoIdCounter = useRef(0)
+  const photoStripRef = useRef<HTMLCanvasElement>(null)
 
   const handleUploadClick = () => {
     fileInputRef.current?.click()
@@ -446,6 +451,49 @@ export default function UploadComponent() {
     setTextColor(color)
   }
 
+  // Add function to save the photostrip to Supabase
+  const savePhotoStrip = async () => {
+    try {
+      if (!photoStripRef.current || photos.length < 3) {
+        console.error('Cannot save photostrip: Canvas or photos not ready')
+        return
+      }
+
+      setSaving(true)
+      setSaveSuccess(null)
+      setCaptureMessage('Saving your photostrip...')
+      
+      // Get the photostrip canvas data URL
+      const photoStripDataUrl = photoStripRef.current.toDataURL('image/jpeg', 0.95)
+      
+      console.log('Starting save operation with Supabase from UploadComponent...')
+      
+      // Save the session to Supabase
+      const savedUrl = await savePhotoStripSession(
+        photos,
+        photoStripDataUrl,
+        caption
+      )
+      
+      console.log('Supabase operation completed, returned URL:', savedUrl)
+      
+      if (savedUrl) {
+        setSaveSuccess(true)
+        setSavedUrl(savedUrl)
+        setCaptureMessage('Your photostrip has been saved!')
+      } else {
+        setSaveSuccess(false)
+        setCaptureMessage('Failed to save your photostrip, please try again.')
+      }
+    } catch (error) {
+      console.error('Error saving photostrip:', error)
+      setSaveSuccess(false)
+      setCaptureMessage('Error saving your photostrip, please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="space-y-8 max-w-4xl mx-auto film-grain">
       {currentCropImage ? (
@@ -624,9 +672,26 @@ export default function UploadComponent() {
               caption={caption}
               fontStyle={fontStyle}
               textColor={textColor}
+              canvasRef={photoStripRef}
             />
           </div>
         </div>
+      )}
+
+      {/* Add this where the buttons are displayed */}
+      {photos.length === 3 && showCustomization && (
+        <button
+          onClick={savePhotoStrip}
+          disabled={saving}
+          className="flex items-center justify-center gap-2 bg-amber-700 hover:bg-amber-800 text-white py-2 px-4 rounded-lg transition-colors"
+        >
+          {saving ? 'Saving...' : (
+            <>
+              <Save size={18} />
+              Save to Cloud
+            </>
+          )}
+        </button>
       )}
     </div>
   )

@@ -1,11 +1,12 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Camera, Timer, ImagePlus, Trash2 } from 'lucide-react'
+import { Camera, Timer, ImagePlus, Trash2, Save } from 'lucide-react'
 import FilterComponent, { FilterType } from './FilterComponent'
 import FrameComponent, { FrameType } from './FrameComponent'
 import CaptionComponent, { FontStyle } from './CaptionComponent'
 import PhotoStripComponent from './PhotoStripComponent'
+import { savePhotoStripSession, uploadBase64Image } from '@/lib/supabase'
 
 interface Photo {
   id: string
@@ -31,11 +32,15 @@ export default function PhotoboothComponent() {
   // UI state
   const [showCustomization, setShowCustomization] = useState(false)
   const [isPortrait, setIsPortrait] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState<boolean | null>(null)
+  const [savedUrl, setSavedUrl] = useState<string | null>(null)
   
   // Refs
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const photoIdCounter = useRef(0)
+  const photoStripRef = useRef<HTMLCanvasElement>(null)
 
   // Add a new state variable for the flash effect
   const [showFlash, setShowFlash] = useState(false)
@@ -306,6 +311,48 @@ export default function PhotoboothComponent() {
     setTextColor(color)
   }
 
+  // Add a function to save the photostrip to Supabase
+  const savePhotoStrip = async () => {
+    try {
+      if (!photoStripRef.current || photos.length < 3) {
+        console.error('Cannot save photostrip: Canvas or photos not ready')
+        return
+      }
+
+      setSaving(true)
+      setSaveSuccess(null)
+      
+      // Get the photostrip canvas data URL
+      const photoStripDataUrl = photoStripRef.current.toDataURL('image/jpeg', 0.95)
+      
+      console.log('Starting save operation with Supabase...')
+      
+      // Save the session to Supabase
+      const savedUrl = await savePhotoStripSession(
+        photos,
+        photoStripDataUrl,
+        caption
+      )
+      
+      console.log('Supabase operation completed, returned URL:', savedUrl)
+      
+      if (savedUrl) {
+        setSaveSuccess(true)
+        setSavedUrl(savedUrl)
+        setCaptureMessage('Your photostrip has been saved!')
+      } else {
+        setSaveSuccess(false)
+        setCaptureMessage('Failed to save your photostrip, please try again.')
+      }
+    } catch (error) {
+      console.error('Error saving photostrip:', error)
+      setSaveSuccess(false)
+      setCaptureMessage('Error saving your photostrip, please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="space-y-8 max-w-4xl mx-auto film-grain">
       {!showCustomization ? (
@@ -469,16 +516,37 @@ export default function PhotoboothComponent() {
           
           {/* Photostrip preview and download */}
           <div>
-            <PhotoStripComponent 
-              photos={photos.filter(photo => photo !== null)}
-              filter={selectedFilter}
-              frame={selectedFrame}
-              caption={caption}
-              fontStyle={fontStyle}
-              textColor={textColor}
-            />
+            {photos.length > 0 && showCustomization && (
+              <div className="mt-6">
+                <PhotoStripComponent
+                  photos={photos}
+                  filter={selectedFilter}
+                  frame={selectedFrame}
+                  caption={caption}
+                  fontStyle={fontStyle}
+                  textColor={textColor}
+                  canvasRef={photoStripRef}
+                />
+              </div>
+            )}
           </div>
         </div>
+      )}
+
+      {/* Add this in the right spot in your render section where buttons are located */}
+      {photos.length === 3 && showCustomization && (
+        <button
+          onClick={savePhotoStrip}
+          disabled={saving}
+          className="flex items-center justify-center gap-2 bg-amber-700 hover:bg-amber-800 text-white py-2 px-4 rounded-lg transition-colors"
+        >
+          {saving ? 'Saving...' : (
+            <>
+              <Save size={18} />
+              Save to Cloud
+            </>
+          )}
+        </button>
       )}
     </div>
   )

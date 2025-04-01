@@ -1,7 +1,6 @@
 # Retrivia
 
-- Retrivia comes from "Retrieve" (bringing back past moments) with a touch of nostalgia. The web application allows users to create memorable photostrips of special moments and add personal memorial notes to preserve the emotions and context of each memory. In the future, a semantic search feature will make it easy to find and relive these moments based on the content of your memorial notes. 
-
+- Retrivia comes from "Retrieve" (bringing back past moments) with a touch of nostalgia. The web application allows users to create memorable photostrips of special moments and add personal memorial notes to preserve the emotions and context of each memory. In the future, a semantic search feature will make it easy to find and relive these moments based on the content of your memorial notes.
 - Built with Next.js, TypeScript, and Tailwind CSS.
 
 ## Features
@@ -13,6 +12,7 @@
 - Add memorial notes to preserve the feelings and context of each moment
 - Save and revisit your memories with a semantic search feature (coming soon)
 - Download high-quality photostrips with your memorial notes
+- Cloud storage for your photos and photostrips using Supabase
 
 ## Tech Stack
 
@@ -20,6 +20,7 @@
 - React 18.3.1
 - TypeScript
 - Tailwind CSS
+- Supabase (Storage and Database)
 
 ## Getting Started
 
@@ -28,11 +29,19 @@
    ```bash
    npm install
    ```
-3. Run the development server:
+3. Set up Supabase (see [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) for detailed instructions)
+4. Configure environment variables in `.env`:
+   ```
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
+   NEXT_PUBLIC_MAX_PHOTO_SIZE=5242880 # 5MB in bytes
+   NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+   ```
+5. Run the development server:
    ```bash
    npm run dev
    ```
-4. Open [http://localhost:3000](http://localhost:3000) in your browser
+6. Open [http://localhost:3000](http://localhost:3000) in your browser
 
 ## Development
 
@@ -65,6 +74,7 @@ Retrivia/
 │   │   │   └── UploadComponent.tsx
 │   │   └── ui/             # Shared UI components
 │   ├── lib/                # Utility functions
+│   │   ├── supabase.ts     # Supabase client and utilities
 │   │   └── utils/          # Utility functions
 │   │       └── photo.ts    # Photo manipulation utilities
 │   └── types/              # TypeScript type definitions
@@ -73,6 +83,7 @@ Retrivia/
 ├── next.config.js          # Next.js configuration
 ├── package.json            # Dependencies and scripts
 ├── postcss.config.js       # PostCSS configuration
+├── SUPABASE_SETUP.md       # Supabase setup instructions
 ├── tailwind.config.js      # Tailwind CSS configuration
 └── tsconfig.json           # TypeScript configuration
 ```

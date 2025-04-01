@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef, useEffect, useState } from 'react'
+import React, { useRef, useEffect, useState, forwardRef } from 'react'
 import { Download, Share2, MessageSquare } from 'lucide-react'
 import { FilterType } from './FilterComponent'
 import { FrameType } from './FrameComponent'
@@ -18,20 +18,28 @@ interface PhotoStripComponentProps {
   caption: string
   fontStyle: FontStyle
   textColor: string
+  canvasRef?: React.RefObject<HTMLCanvasElement | null>
 }
 
-export default function PhotoStripComponent({
+const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentProps>(({
   photos,
   filter,
   frame,
   caption,
   fontStyle,
-  textColor
-}: PhotoStripComponentProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  textColor,
+  canvasRef: externalCanvasRef
+}: PhotoStripComponentProps, ref) => {
+  const internalCanvasRef = useRef<HTMLCanvasElement>(null)
   const [memorialMessage, setMemorialMessage] = useState<string>('')
   const [showMessageModal, setShowMessageModal] = useState<boolean>(false)
   const [savedMessages, setSavedMessages] = useState<{message: string, date: string}[]>([])
+
+  // Use the external ref if provided, otherwise use the internal ref
+  const canvasRef = externalCanvasRef || internalCanvasRef
+  
+  // Forward the internal ref if no external ref was provided but a ref was passed
+  React.useImperativeHandle(ref, () => internalCanvasRef.current!, [])
 
   // Re-render the photostrip when props change
   useEffect(() => {
@@ -501,4 +509,6 @@ export default function PhotoStripComponent({
       )}
     </div>
   )
-} 
+})
+
+export default PhotoStripComponent 
