@@ -226,8 +226,18 @@ export const getSavedPhotoStripSessions = async (limit = 20) => {
       return null
     }
     
+    // Define session interface to avoid 'any' type
+    interface SessionRecord {
+      id: string;
+      created_at: string;
+      photo_urls: string | string[];
+      photostrip_url: string;
+      captions: string;
+      [key: string]: any; // Allow other properties
+    }
+    
     // Parse the photo_urls JSON strings back to arrays
-    const sessionsWithParsedUrls = data.map(session => ({
+    const sessionsWithParsedUrls = data.map((session: SessionRecord) => ({
       ...session,
       photo_urls: typeof session.photo_urls === 'string' 
         ? JSON.parse(session.photo_urls) 
