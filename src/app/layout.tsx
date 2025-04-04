@@ -26,7 +26,7 @@ export default function RootLayout({
               className="flex items-center justify-center md:justify-start"
             >
               <span className="text-2xl font-vintage text-vintage-sepia">
-                Retrivia
+                Retrivia <span className="text-sm">by Cikal Merdeka</span>
               </span>
             </Link>
           </div>
