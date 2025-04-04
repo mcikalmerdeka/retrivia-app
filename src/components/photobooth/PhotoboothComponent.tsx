@@ -22,6 +22,9 @@ export default function PhotoboothComponent() {
   const [captureMessage, setCaptureMessage] = useState<string | null>(null)
   const [processingPhotos, setProcessingPhotos] = useState(false)
   
+  // Add camera facing mode state
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user')
+  
   // Photography customization state
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('raw')
   const [selectedFrame, setSelectedFrame] = useState<FrameType>('classic')
@@ -69,7 +72,7 @@ export default function PhotoboothComponent() {
     return () => {
       stopCamera()
     }
-  }, [isPortrait]) // Restart camera when orientation changes
+  }, [isPortrait, facingMode]) // Restart camera when orientation changes and facingMode changes
 
   const startCamera = async () => {
     try {
@@ -78,7 +81,7 @@ export default function PhotoboothComponent() {
         video: {
           width: { ideal: isPortrait ? 720 : 1280 },
           height: { ideal: isPortrait ? 1280 : 720 },
-          facingMode: 'user'
+          facingMode: facingMode
         },
         audio: false
       }
@@ -193,12 +196,21 @@ export default function PhotoboothComponent() {
         
         // For selfie view, we need to mirror horizontally
         ctx.save()
-        ctx.scale(-1, 1) // Mirror horizontally
-        ctx.drawImage(
-          video,
-          srcX, srcY, srcWidth, srcHeight, // Source coordinates
-          -canvasWidth, 0, canvasWidth, canvasHeight // Destination coordinates (negative x for mirroring)
-        )
+        if (facingMode === 'user') {
+          ctx.scale(-1, 1) // Mirror horizontally for front camera only
+          ctx.drawImage(
+            video,
+            srcX, srcY, srcWidth, srcHeight, // Source coordinates
+            -canvasWidth, 0, canvasWidth, canvasHeight // Destination coordinates (negative x for mirroring)
+          )
+        } else {
+          // No mirroring for back camera
+          ctx.drawImage(
+            video,
+            srcX, srcY, srcWidth, srcHeight, // Source coordinates
+            0, 0, canvasWidth, canvasHeight // Destination coordinates (no mirroring)
+          )
+        }
         ctx.restore()
         
         // Only apply effects if not using 'raw' filter
@@ -353,6 +365,17 @@ export default function PhotoboothComponent() {
     }
   }
 
+  // Add a function to toggle camera
+  const toggleCamera = async () => {
+    // Stop the current camera stream
+    stopCamera()
+    
+    // Toggle the facing mode
+    setFacingMode(prev => prev === 'user' ? 'environment' : 'user')
+    
+    // Restart camera with new facing mode (will happen in useEffect)
+  }
+
   return (
     <div className="space-y-8 max-w-4xl mx-auto film-grain">
       {!showCustomization ? (
@@ -365,8 +388,22 @@ export default function PhotoboothComponent() {
               playsInline
               muted
               className="w-full h-full object-cover"
-              style={{ transform: 'scaleX(-1)' }} // Mirror effect for selfie view
+              style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} // Mirror only for selfie view
             />
+            
+            {/* Add camera switch button */}
+            <button 
+              onClick={toggleCamera}
+              className="absolute top-4 right-4 z-10 bg-vintage-paper bg-opacity-70 p-2 rounded-full border border-vintage-sepia"
+              aria-label="Switch Camera"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 16v4a2 2 0 0 1-2 2h-4" />
+                <path d="M14 14V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" />
+                <path d="m18 8 4 4-4 4" />
+                <path d="m6 16-4-4 4-4" />
+              </svg>
+            </button>
             
             {/* Camera Flash Effect */}
             {showFlash && (
