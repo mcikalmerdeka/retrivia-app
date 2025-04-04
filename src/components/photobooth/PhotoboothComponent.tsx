@@ -122,6 +122,19 @@ export default function PhotoboothComponent() {
     }
   }
 
+  // Set up an effect to auto-save when entering customization mode
+  useEffect(() => {
+    // Only attempt to auto-save if we have 3 photos and are in the customization view
+    if (showCustomization && photos.filter(photo => photo !== null).length === 3) {
+      // Wait for the PhotoStripComponent to render
+      const timer = setTimeout(() => {
+        autoSaveToCloud();
+      }, 1000); // Longer delay to ensure canvas is fully rendered
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showCustomization, photos]);
+
   // Start the automatic photo capture sequence
   const startPhotoSequence = () => {
     // Initialize an array with three empty slots
@@ -249,36 +262,43 @@ export default function PhotoboothComponent() {
         const dataUrl = canvas.toDataURL('image/jpeg', 1.0) // Use maximum quality
         const newId = `photo-${photoIdCounter.current++}`
         
-        // Use functional update to ensure we're working with the latest state
-        setPhotos(prevPhotos => {
-          console.log('Previous photos state:', prevPhotos);
-          const newPhotos = [...prevPhotos];
-          newPhotos[photoIndex] = { id: newId, dataUrl };
-          console.log('New photos state:', newPhotos);
-          return newPhotos;
-        });
+        // Update the photos array with the new photo
+        const newPhoto: Photo = {
+          id: newId,
+          dataUrl: dataUrl,
+        }
         
-        // Move to the next photo or finish the sequence
-        const nextPhotoIndex = photoIndex + 1
-        setCurrentPhotoIndex(nextPhotoIndex)
+        setPhotos(prev => {
+          const newPhotos = [...prev]
+          newPhotos[photoIndex] = newPhoto
+          return newPhotos
+        })
         
-        if (nextPhotoIndex < 3) {
-          // Take a short break between photos
+        // Update UI state
+        console.log(`Photo ${photoIndex + 1} captured`)
+        
+        // Determine what to do next
+        if (photoIndex < 2) {
+          // Schedule the next photo capture with a delay
           setTimeout(() => {
-            startCountdownForPhoto(nextPhotoIndex)
-          }, 1000)
+            startCountdownForPhoto(photoIndex + 1)
+          }, 1500) // 1.5 second pause between photos
         } else {
-          // All photos captured, move to customization
-          setProcessingPhotos(true)
-          setCaptureMessage("Creating your photostrip...")
-          setTimeout(() => {
-            setProcessingPhotos(false)
-            setCaptureMessage(null)
-            setIsCapturing(false)
-            setShowCustomization(true)
-          }, 1500)
+          // All photos captured
+          setIsCapturing(false)
+          setCurrentPhotoIndex(0)
+          setCountdown(0)
+          setCaptureMessage('Memories captured! Customize your photostrip.')
+          setProcessingPhotos(false)
+          
+          // Automatically enter customization mode
+          setShowCustomization(true)
+          
+          // No longer call autoSaveToCloud() here - it will be handled by the useEffect
         }
       }
+    } else {
+      console.error('Video element is not available')
     }
   }
 
@@ -321,6 +341,71 @@ export default function PhotoboothComponent() {
   // Function to handle text color change
   const handleTextColorChange = (color: string) => {
     setTextColor(color)
+  }
+
+  // Modify the autoSaveToCloud function to be more robust
+  const autoSaveToCloud = async () => {
+    try {
+      // Make sure we have the canvas and photos
+      if (!photoStripRef.current) {
+        console.error('Cannot auto-save photostrip: Canvas not ready')
+        return
+      }
+      
+      if (photos.filter(photo => photo !== null).length < 3) {
+        console.error('Cannot auto-save photostrip: Not enough photos')
+        return
+      }
+
+      // Check if already saving or saved
+      if (saving || saveSuccess === true) {
+        return
+      }
+
+      setSaving(true)
+      
+      // Get the photostrip canvas data URL
+      const photoStripDataUrl = photoStripRef.current.toDataURL('image/jpeg', 0.95)
+      
+      console.log('Auto-saving photos to Supabase...')
+      
+      // Save the session to Supabase
+      const savedUrl = await savePhotoStripSession(
+        photos.filter(photo => photo !== null),
+        photoStripDataUrl,
+        caption
+      )
+      
+      console.log('Auto-save completed, returned URL:', savedUrl)
+      
+      if (savedUrl) {
+        setSaveSuccess(true)
+        setSavedUrl(savedUrl)
+        setCaptureMessage('Your photostrip has been automatically saved to the cloud!')
+        
+        // Show a temporary notification
+        const notification = document.createElement('div')
+        notification.className = 'fixed bottom-4 right-4 bg-green-600 text-white py-2 px-4 rounded-lg shadow-lg z-50 animate-fadeIn'
+        notification.innerHTML = 'Photos automatically saved to cloud!'
+        document.body.appendChild(notification)
+        
+        // Remove notification after 3 seconds
+        setTimeout(() => {
+          notification.classList.replace('animate-fadeIn', 'animate-fadeOut')
+          setTimeout(() => {
+            document.body.removeChild(notification)
+          }, 500)
+        }, 3000)
+      } else {
+        setSaveSuccess(false)
+        setCaptureMessage('Automatic cloud save failed, but you can still download your photos.')
+      }
+    } catch (error) {
+      console.error('Error in auto-save:', error)
+      setSaveSuccess(false)
+    } finally {
+      setSaving(false)
+    }
   }
 
   // Add a function to save the photostrip to Supabase
@@ -568,22 +653,6 @@ export default function PhotoboothComponent() {
             )}
           </div>
         </div>
-      )}
-
-      {/* Add this in the right spot in your render section where buttons are located */}
-      {photos.length === 3 && showCustomization && (
-        <button
-          onClick={savePhotoStrip}
-          disabled={saving}
-          className="flex items-center justify-center gap-2 bg-amber-700 hover:bg-amber-800 text-white py-2 px-4 rounded-lg transition-colors"
-        >
-          {saving ? 'Saving...' : (
-            <>
-              <Save size={18} />
-              Save to Cloud
-            </>
-          )}
-        </button>
       )}
     </div>
   )

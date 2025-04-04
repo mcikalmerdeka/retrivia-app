@@ -48,6 +48,19 @@ export default function UploadComponent() {
   const photoIdCounter = useRef(0)
   const photoStripRef = useRef<HTMLCanvasElement>(null)
 
+  // Set up an effect to auto-save when entering customization mode
+  useEffect(() => {
+    // Only attempt to auto-save if we have 3 photos and are in the customization view
+    if (showCustomization && photos.length === 3) {
+      // Wait for the PhotoStripComponent to fully render
+      const timer = setTimeout(() => {
+        autoSaveToCloud();
+      }, 1000); // Longer delay to ensure canvas is fully rendered
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showCustomization, photos]);
+
   const handleUploadClick = () => {
     fileInputRef.current?.click()
   }
@@ -117,6 +130,7 @@ export default function UploadComponent() {
       // Automatically switch to customization if we have 3 photos
       if (photos.length + 1 >= 3) {
         setShowCustomization(true)
+        // We'll let the useEffect handle the auto-save now
       }
     } catch (error) {
       console.error('Error processing cropped photo:', error)
@@ -451,6 +465,74 @@ export default function UploadComponent() {
     setTextColor(color)
   }
 
+  // Modify the autoSaveToCloud function to be more robust
+  const autoSaveToCloud = async (photosToSave = photos) => {
+    try {
+      // Make sure we have the canvas and photos
+      if (!photoStripRef.current) {
+        console.error('Cannot auto-save photostrip: Canvas not ready')
+        return
+      }
+      
+      if (photosToSave.length < 3) {
+        console.error('Cannot auto-save photostrip: Not enough photos')
+        return
+      }
+      
+      // Check if already saving or saved
+      if (saving || saveSuccess === true) {
+        return
+      }
+
+      setSaving(true)
+      setSaveSuccess(null)
+      setCaptureMessage('Automatically saving your photos to the cloud...')
+      
+      // Get the photostrip canvas data URL
+      const photoStripDataUrl = photoStripRef.current.toDataURL('image/jpeg', 0.95)
+      
+      console.log('Auto-saving photos to Supabase from UploadComponent...')
+      
+      // Save the session to Supabase
+      const savedUrl = await savePhotoStripSession(
+        photosToSave,
+        photoStripDataUrl,
+        caption
+      )
+      
+      console.log('Auto-save operation completed, returned URL:', savedUrl)
+      
+      if (savedUrl) {
+        setSaveSuccess(true)
+        setSavedUrl(savedUrl)
+        setCaptureMessage('Your photos have been automatically saved to the cloud!')
+        
+        // Show a temporary notification
+        const notification = document.createElement('div')
+        notification.className = 'fixed bottom-4 right-4 bg-green-600 text-white py-2 px-4 rounded-lg shadow-lg z-50 animate-fadeIn'
+        notification.innerHTML = 'Photos automatically saved to cloud!'
+        document.body.appendChild(notification)
+        
+        // Remove notification after 3 seconds
+        setTimeout(() => {
+          notification.classList.replace('animate-fadeIn', 'animate-fadeOut')
+          setTimeout(() => {
+            document.body.removeChild(notification)
+          }, 500)
+        }, 3000)
+      } else {
+        setSaveSuccess(false)
+        setCaptureMessage('Automatic cloud save failed, but you can still customize your photostrip.')
+      }
+    } catch (error) {
+      console.error('Error in auto-save:', error)
+      setSaveSuccess(false)
+      setCaptureMessage('Error during auto-save, but you can still customize your photostrip.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // Add function to save the photostrip to Supabase
   const savePhotoStrip = async () => {
     try {
@@ -676,22 +758,6 @@ export default function UploadComponent() {
             />
           </div>
         </div>
-      )}
-
-      {/* Add this where the buttons are displayed */}
-      {photos.length === 3 && showCustomization && (
-        <button
-          onClick={savePhotoStrip}
-          disabled={saving}
-          className="flex items-center justify-center gap-2 bg-amber-700 hover:bg-amber-800 text-white py-2 px-4 rounded-lg transition-colors"
-        >
-          {saving ? 'Saving...' : (
-            <>
-              <Save size={18} />
-              Save to Cloud
-            </>
-          )}
-        </button>
       )}
     </div>
   )
