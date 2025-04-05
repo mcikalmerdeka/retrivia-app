@@ -381,21 +381,10 @@ export default function PhotoboothComponent() {
       if (savedUrl) {
         setSaveSuccess(true)
         setSavedUrl(savedUrl)
-        setCaptureMessage('Your photostrip has been automatically saved to the cloud!')
+        // Remove notification message
+        setCaptureMessage(null)
         
-        // Show a temporary notification
-        const notification = document.createElement('div')
-        notification.className = 'fixed bottom-4 right-4 bg-green-600 text-white py-2 px-4 rounded-lg shadow-lg z-50 animate-fadeIn'
-        notification.innerHTML = 'Photos automatically saved to cloud!'
-        document.body.appendChild(notification)
-        
-        // Remove notification after 3 seconds
-        setTimeout(() => {
-          notification.classList.replace('animate-fadeIn', 'animate-fadeOut')
-          setTimeout(() => {
-            document.body.removeChild(notification)
-          }, 500)
-        }, 3000)
+        // Removed notification code
       } else {
         setSaveSuccess(false)
         setCaptureMessage('Automatic cloud save failed, but you can still download your photos.')
