@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import Link from 'next/link'
-import { LogOut, User, Camera, Upload, Book } from 'lucide-react'
+import { LogOut, User as UserIcon, Camera, Upload, Book } from 'lucide-react'
 
 export default function UserMenu() {
   const { user, signOut, isLoading, isAuthenticated } = useAuth()
@@ -33,6 +33,9 @@ export default function UserMenu() {
     }
   }
 
+  // Display username from email (part before @)
+  const displayName = user?.email ? user.email.split('@')[0] : 'User'
+
   if (isLoading) {
     return (
       <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
@@ -57,19 +60,11 @@ export default function UserMenu() {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-vintage-paper transition-colors"
       >
-        {user?.user_metadata?.avatar_url ? (
-          <img 
-            src={user.user_metadata.avatar_url} 
-            alt={user.user_metadata.full_name || 'User'} 
-            className="h-8 w-8 rounded-full border-2 border-vintage-sepia"
-          />
-        ) : (
-          <div className="h-8 w-8 rounded-full bg-vintage-sepia flex items-center justify-center text-white">
-            <User size={16} />
-          </div>
-        )}
+        <div className="h-8 w-8 rounded-full bg-vintage-sepia flex items-center justify-center text-white">
+          <UserIcon size={16} />
+        </div>
         <span className="hidden md:block text-vintage-sepia">
-          {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
+          {displayName}
         </span>
       </button>
 
@@ -77,7 +72,7 @@ export default function UserMenu() {
         <div className="absolute right-0 mt-2 w-48 bg-white border-2 border-vintage-sepia rounded-lg shadow-lg py-2 z-50">
           <div className="px-4 py-2 border-b border-vintage-paper">
             <p className="font-medium text-vintage-sepia">
-              {user?.user_metadata?.full_name || 'User'}
+              {displayName}
             </p>
             <p className="text-sm text-gray-500 truncate">
               {user?.email}
