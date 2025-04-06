@@ -297,7 +297,7 @@ export default function PhotobookPage() {
                         {selectedSession.memory_notes ? (
                           <p className="text-vintage-text whitespace-pre-wrap">{selectedSession.memory_notes}</p>
                         ) : (
-                          <p className="text-gray-400 italic">No memory notes yet. Click "Add Note" to write your thoughts about this moment.</p>
+                          <p className="text-gray-400 italic">No memory notes yet. Click &quot;Add Note&quot; to write your thoughts about this moment.</p>
                         )}
                       </div>
                     )}
