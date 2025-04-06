@@ -18,16 +18,36 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Instead of using createRouteHandlerClient, just log the code
-    // and redirect to the app - the client-side code will handle the session
     if (code) {
-      console.log('Auth code received, redirecting to app')
+      try {
+        console.log('Auth code received, exchanging for session')
+        
+        // Exchange the auth code for a session
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+        
+        if (exchangeError) {
+          console.error('Error exchanging code for session:', exchangeError)
+          return NextResponse.redirect(
+            new URL(`/login?error=${encodeURIComponent('Failed to complete authentication')}`, requestUrl.origin)
+          )
+        }
+        
+        console.log('Successfully exchanged code for session')
+        
+        // URL to redirect to after sign in process completes
+        return NextResponse.redirect(new URL('/photobook', requestUrl.origin))
+      } catch (exchangeError) {
+        console.error('Exception in code exchange:', exchangeError)
+        return NextResponse.redirect(
+          new URL(`/login?error=${encodeURIComponent('Authentication error during code exchange')}`, requestUrl.origin)
+        )
+      }
     } else {
       console.warn('No code found in callback URL')
+      return NextResponse.redirect(
+        new URL(`/login?error=${encodeURIComponent('Missing authentication code')}`, requestUrl.origin)
+      )
     }
-
-    // URL to redirect to after sign in process completes
-    return NextResponse.redirect(new URL('/photobook', requestUrl.origin))
   } catch (error) {
     console.error('Error in auth callback:', error)
     const requestUrl = new URL(request.url)

@@ -12,12 +12,38 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const code = searchParams.get('code')
+
+  // Debug auth state on mount
+  useEffect(() => {
+    const checkAuthState = async () => {
+      console.log('Login page loaded, checking auth state')
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        console.log('Auth state on login page:', { 
+          hasUser: !!user, 
+          hasSession: !!session,
+          userId: user?.id ? user.id.substring(0, 8) + '...' : null
+        })
+        
+        if (user && session) {
+          console.log('User is already authenticated, redirecting to photobook')
+          router.push('/photobook')
+        }
+      } catch (err) {
+        console.error('Error checking auth state on login page:', err)
+      }
+    }
+    
+    checkAuthState()
+  }, [router])
 
   // Check for error in URL parameters (from redirect)
   useEffect(() => {
     const errorParam = searchParams.get('error')
     if (errorParam) {
+      console.log('Error parameter found in URL:', errorParam)
       setError(decodeURIComponent(errorParam))
     }
   }, [searchParams])
@@ -25,42 +51,25 @@ export default function LoginPage() {
   // If already authenticated, redirect to photobook
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
+      console.log('Auth context shows authenticated, redirecting to photobook')
       router.push('/photobook')
     }
   }, [isAuthenticated, isLoading, router])
-
-  useEffect(() => {
-    // Handle code exchange if it exists
-    const handleCode = async () => {
-      if (code) {
-        try {
-          // Exchange code for session
-          await supabase.auth.exchangeCodeForSession(code)
-          // Check if session exists
-          const { data: { session } } = await supabase.auth.getSession()
-          if (session) {
-            router.push('/photobook')
-          }
-        } catch (err) {
-          console.error('Error exchanging code for session:', err)
-        }
-      }
-    }
-    
-    handleCode()
-  }, [code, router])
 
   const handleGoogleSignIn = async () => {
     try {
       setIsSigningIn(true)
       setError(null)
       
-      // Call signInWithGoogle without trying to destructure a return value
+      console.log('Initiating Google sign-in')
       await signInWithGoogle()
-      // The redirect will happen automatically
+      console.log('Sign-in initiated, waiting for redirect')
+      
+      // The OAuth flow will redirect to the callback URL
+      // No need to do anything else here as the redirect happens automatically
     } catch (err: any) {
-      console.error('Unexpected error during sign in:', err)
-      setError(`An unexpected error occurred: ${err?.message || 'Please try again'}`)
+      console.error('Error initiating sign-in:', err)
+      setError(`Sign-in failed: ${err?.message || 'Please try again'}`)
       setIsSigningIn(false)
     }
   }

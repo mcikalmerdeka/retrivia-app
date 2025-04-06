@@ -65,17 +65,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signInWithGoogle = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/login`
-      }
-    })
+    try {
+      console.log('Starting Google sign-in process');
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            prompt: 'select_account' // Force Google to show the account selector
+          }
+        }
+      });
+      console.log('Sign-in request sent to OAuth provider');
+    } catch (error) {
+      console.error('Failed to initiate sign-in:', error);
+      throw error;
+    }
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
+    try {
+      console.log('Signing out user');
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Error during sign out:', error);
+        throw error;
+      }
+      
+      // Clear user state
+      setUser(null);
+      console.log('User signed out successfully');
+      
+      // Redirect to login page after sign out is complete
+      router.push('/login');
+      
+      // Force reload the page to reset all client state
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Failed to sign out:', error);
+      // Try to redirect anyway
+      router.push('/login');
+    }
   }
 
   return (
