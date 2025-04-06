@@ -13,40 +13,53 @@ export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // Debug auth state on mount
+  // Reset auth on login page load
   useEffect(() => {
-    const checkAuthState = async () => {
-      console.log('Login page loaded, checking auth state')
+    const resetAuth = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        console.log('Auth state on login page:', { 
-          hasUser: !!user, 
-          hasSession: !!session,
-          userId: user?.id ? user.id.substring(0, 8) + '...' : null
-        })
-        
-        if (user && session) {
-          console.log('User is already authenticated, redirecting to photobook')
-          router.push('/photobook')
+        // Check if there was an auth error from a URL param
+        const errorParam = searchParams.get('error')
+        if (errorParam) {
+          console.log('Error parameter found in URL:', errorParam)
+          setError(decodeURIComponent(errorParam))
+          
+          // Clear the session if there was an auth error
+          await supabase.auth.signOut({ scope: 'local' })
+          console.log('Cleared local session due to auth error')
+          return
         }
+        
+        // Only perform a session check if there's no error
+        await checkAuthState()
       } catch (err) {
-        console.error('Error checking auth state on login page:', err)
+        console.error('Error in login page initialization:', err)
       }
     }
     
-    checkAuthState()
-  }, [router])
-
-  // Check for error in URL parameters (from redirect)
-  useEffect(() => {
-    const errorParam = searchParams.get('error')
-    if (errorParam) {
-      console.log('Error parameter found in URL:', errorParam)
-      setError(decodeURIComponent(errorParam))
-    }
+    resetAuth()
   }, [searchParams])
+  
+  // Separate function to check auth state
+  const checkAuthState = async () => {
+    console.log('Login page loaded, checking auth state')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      console.log('Auth state on login page:', { 
+        hasUser: !!user, 
+        hasSession: !!session,
+        userId: user?.id ? user.id.substring(0, 8) + '...' : null
+      })
+      
+      if (user && session) {
+        console.log('User is already authenticated, redirecting to photobook')
+        router.push('/photobook')
+      }
+    } catch (err) {
+      console.error('Error checking auth state on login page:', err)
+    }
+  }
 
   // If already authenticated, redirect to photobook
   useEffect(() => {
@@ -57,16 +70,17 @@ export default function LoginPage() {
   }, [isAuthenticated, isLoading, router])
 
   const handleGoogleSignIn = async () => {
+    if (isSigningIn) return
+    
     try {
       setIsSigningIn(true)
       setError(null)
       
       console.log('Initiating Google sign-in')
       await signInWithGoogle()
-      console.log('Sign-in initiated, waiting for redirect')
       
-      // The OAuth flow will redirect to the callback URL
-      // No need to do anything else here as the redirect happens automatically
+      // No need to do anything else as the redirect will happen automatically 
+      // from the signInWithGoogle function now
     } catch (err: any) {
       console.error('Error initiating sign-in:', err)
       setError(`Sign-in failed: ${err?.message || 'Please try again'}`)

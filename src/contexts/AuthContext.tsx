@@ -67,16 +67,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = async () => {
     try {
       console.log('Starting Google sign-in process');
-      await supabase.auth.signInWithOAuth({
+      
+      // Clear any existing sessions or tokens first to avoid conflicts
+      await supabase.auth.signOut({ scope: 'local' });
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: {
-            prompt: 'select_account' // Force Google to show the account selector
+            access_type: 'offline', // Request a refresh token
+            prompt: 'select_account' // Always show the Google account selector
           }
         }
       });
-      console.log('Sign-in request sent to OAuth provider');
+      
+      if (error) {
+        console.error('Error starting OAuth flow:', error);
+        throw error;
+      }
+      
+      if (!data.url) {
+        console.error('No OAuth URL returned');
+        throw new Error('Failed to get OAuth URL');
+      }
+      
+      console.log('Sign-in request successful, redirecting to provider');
+      
+      // Redirect manually to ensure it happens
+      window.location.href = data.url;
     } catch (error) {
       console.error('Failed to initiate sign-in:', error);
       throw error;
