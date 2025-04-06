@@ -21,7 +21,7 @@ interface PhotoStripComponentProps {
   caption: string
   fontStyle: FontStyle
   textColor: string
-  canvasRef?: React.RefObject<HTMLCanvasElement | null>
+  canvasRef?: React.RefObject<HTMLCanvasElement>
   sessionId?: string
   onSaveComplete?: () => void
 }
@@ -50,8 +50,11 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
   
   // Forward the internal ref if no external ref was provided but a ref was passed
   React.useImperativeHandle(ref, () => {
+    if (!internalCanvasRef.current) {
+      return document.createElement('canvas');
+    }
     // Return the canvas element with added methods
-    const canvas = internalCanvasRef.current!;
+    const canvas = internalCanvasRef.current;
     // Add the renderPhotoStrip method to the canvas
     (canvas as any).renderPhotoStrip = () => renderPhotoStrip();
     // Return the enhanced canvas
@@ -179,228 +182,236 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
 
   const renderPhotoStrip = (): Promise<void> => {
     return new Promise((resolve, reject) => {
-      if (!canvasRef.current || photos.length === 0) {
-        reject(new Error('Canvas or photos not available'));
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        console.error('Canvas not available');
+        reject(new Error('Canvas not available'));
+        return;
+      }
+      
+      if (photos.length === 0) {
+        console.error('No photos available');
+        reject(new Error('No photos available'));
         return;
       }
 
-    const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')
+      const ctx = canvas.getContext('2d');
       if (!ctx) {
+        console.error('Cannot get canvas context');
         reject(new Error('Cannot get canvas context'));
         return;
       }
 
-    // Use 9:16 aspect ratio (smartphone aspect ratio)
-    canvas.width = 450  // Reverted to original dimension
-    canvas.height = 800  // Reverted to original dimension
+      // Use 9:16 aspect ratio (smartphone aspect ratio)
+      canvas.width = 450  // Reverted to original dimension
+      canvas.height = 800  // Reverted to original dimension
 
-    // Fill background with vintage paper color
-    ctx.fillStyle = '#f9f5e7' // Vintage paper background
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
+      // Fill background with vintage paper color
+      ctx.fillStyle = '#f9f5e7' // Vintage paper background
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    // Calculate photo dimensions and positions
-    const photoWidth = canvas.width * 0.85 // Size from example
-    const photoHeight = photoWidth * 0.6 // Height that allows 3 photos to fit nicely
-    const marginX = (canvas.width - photoWidth) / 2
-    
-    // Calculate spacing to match example
-    const totalVerticalSpace = canvas.height;
-    const captionDateAreaHeight = 110; // Increased space for caption and date
-    const topMargin = 30; // Reduced top margin to raise photos
-    const photoAreaHeight = totalVerticalSpace - captionDateAreaHeight - topMargin;
-    
-    // Calculate spacing between photos to be even
-    const photosTotalHeight = photoHeight * 3;
-    const remainingSpace = photoAreaHeight - photosTotalHeight;
-    const spaceBetween = remainingSpace / 4; // Top, between photos, and before date
-    
-    // Apply filter to context (except for "raw" filter)
-    if (filter !== 'raw') {
-      ctx.filter = getFilterStyle(ctx, filter)
-    }
+      // Calculate photo dimensions and positions
+      const photoWidth = canvas.width * 0.85 // Size from example
+      const photoHeight = photoWidth * 0.6 // Height that allows 3 photos to fit nicely
+      const marginX = (canvas.width - photoWidth) / 2
+      
+      // Calculate spacing to match example
+      const totalVerticalSpace = canvas.height;
+      const captionDateAreaHeight = 110; // Increased space for caption and date
+      const topMargin = 30; // Reduced top margin to raise photos
+      const photoAreaHeight = totalVerticalSpace - captionDateAreaHeight - topMargin;
+      
+      // Calculate spacing between photos to be even
+      const photosTotalHeight = photoHeight * 3;
+      const remainingSpace = photoAreaHeight - photosTotalHeight;
+      const spaceBetween = remainingSpace / 4; // Top, between photos, and before date
+      
+      // Apply filter to context (except for "raw" filter)
+      if (filter !== 'raw') {
+        ctx.filter = getFilterStyle(ctx, filter)
+      }
 
-    // Get frame style
-    const frameStyle = getFrameStyle(frame)
+      // Get frame style
+      const frameStyle = getFrameStyle(frame)
 
-    // Create promises for loading all images
-    const loadImagePromises = photos
-      .filter(photo => photo && photo.dataUrl)
-      .map(photo => {
-        return new Promise<HTMLImageElement>((resolve, reject) => {
-          if (!photo || !photo.dataUrl) {
-            console.error('Invalid photo data', photo);
-            reject(new Error('Invalid photo data'));
-            return;
-          }
-          
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = () => {
-            console.error('Failed to load image', photo.id);
-            reject(new Error('Failed to load image'));
-          };
-          img.src = photo.dataUrl;
-        });
-        });
-
-    // Process images once all are loaded
-    Promise.all(loadImagePromises)
-      .then(photoImages => {
-        // Draw each photo with frame
-        photoImages.forEach((img, index) => {
-          if (!img || typeof img.width !== 'number' || typeof img.height !== 'number') {
-            console.error('Invalid image object', img);
-            return; // Skip this image
-          }
-          
-          // Calculate vertical position with offset from top matching example
-          // Ensure exact consistent spacing between photos
-          const y = topMargin + spaceBetween + index * (photoHeight + spaceBetween)
-          
-          // Draw frame first (if selected)
-          if (frame !== 'none') {
-            // Set frame color
-            ctx.fillStyle = frameStyle.borderColor
-            
-            // Draw frame with appropriate border width - always straight edges
-            // Ensure the frame is drawn with exact dimensions for consistency
-            ctx.fillRect(
-              marginX - frameStyle.borderWidth,
-              y - frameStyle.borderWidth,
-              photoWidth + frameStyle.borderWidth * 2,
-              photoHeight + frameStyle.borderWidth * 2 + (frameStyle.bottomBorder || 0)
-            )
-            
-            // Add film holes if using filmstrip frame
-            if (frameStyle.holes) {
-              const holeRadius = 6 // Smaller holes
-              const holeMargin = 8 // More margin for holes
-              // Left side holes
-              ctx.fillStyle = '#000000'
-              ctx.beginPath()
-              ctx.arc(marginX - frameStyle.borderWidth + holeMargin + holeRadius, y + photoHeight * 0.25, holeRadius, 0, Math.PI * 2)
-              ctx.arc(marginX - frameStyle.borderWidth + holeMargin + holeRadius, y + photoHeight * 0.75, holeRadius, 0, Math.PI * 2)
-              ctx.fill()
-              // Right side holes
-              ctx.beginPath()
-              ctx.arc(marginX + photoWidth + frameStyle.borderWidth - holeMargin - holeRadius, y + photoHeight * 0.25, holeRadius, 0, Math.PI * 2)
-              ctx.arc(marginX + photoWidth + frameStyle.borderWidth - holeMargin - holeRadius, y + photoHeight * 0.75, holeRadius, 0, Math.PI * 2)
-              ctx.fill()
+      // Create promises for loading all images
+      const loadImagePromises = photos
+        .filter(photo => photo && photo.dataUrl)
+        .map(photo => {
+          return new Promise<HTMLImageElement>((resolve, reject) => {
+            if (!photo || !photo.dataUrl) {
+              console.error('Invalid photo data', photo);
+              reject(new Error('Invalid photo data'));
+              return;
             }
-          }
-          
-          // Draw the image ensuring it fits properly within the frame
-          const effectiveWidth = photoWidth - 4; // Slightly smaller to avoid edge cropping
-          const effectiveHeight = photoHeight - 4;
-          
-          // Handle aspect ratio while avoiding cropping
-          const imgAspect = img.width / img.height;
-          const frameAspect = effectiveWidth / effectiveHeight;
-          
-          let drawWidth, drawHeight, offsetX, offsetY;
-          
-          if (imgAspect > frameAspect) {
-            // Image is wider - scale to fit height and center horizontally
-            drawHeight = effectiveHeight;
-            drawWidth = drawHeight * imgAspect;
-            offsetX = (effectiveWidth - drawWidth) / 2;
-            offsetY = 0;
-          } else {
-            // Image is taller - scale to fit width and center vertically
-            drawWidth = effectiveWidth;
-            drawHeight = drawWidth / imgAspect;
-            offsetX = 0;
-            offsetY = (effectiveHeight - drawHeight) / 2;
-          }
-          
-          // Draw the image centered in its frame
-          ctx.drawImage(
-            img,
-            marginX + 2 + offsetX, // 2px inner margin
-            y + 2 + offsetY,      // 2px inner margin 
-            drawWidth,
-            drawHeight
-          );
-          });
-        
-        // Reset filter for text
-        ctx.filter = 'none'
-        
-        // Add a bit of extra spacing between last photo and caption area
-        const lastPhotoBottom = topMargin + spaceBetween + 3 * (photoHeight + spaceBetween) - spaceBetween;
-        const extraSpaceNeeded = Math.max(0, lastPhotoBottom + 25 - (canvas.height - captionDateAreaHeight));
-        
-        // Skip the divider line for a cleaner look like the example
-
-        // Add the date at the bottom to match example
-        const today = new Date()
-        const formattedDate = today.toLocaleDateString('en-GB', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric'
-        })
-        
-        // Position for date and caption - moved lower
-        const dateY = canvas.height - 20;
-        const captionY = canvas.height - 55; // Raised higher from date for better spacing
-        
-        // Add caption if present (positioned below photos and above date)
-        if (caption) {
-            // Add background for better visibility of caption text
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-            ctx.fillRect(0, captionY - 30, canvas.width, 45);
             
-          // Add subtle text shadow for better visibility
-          ctx.save();
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-          ctx.shadowBlur = 2;
-            ctx.shadowOffsetY = 1;
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => {
+              console.error('Failed to load image', photo.id);
+              reject(new Error('Failed to load image'));
+            };
+            img.src = photo.dataUrl;
+          });
+          });
+
+      // Process images once all are loaded
+      Promise.all(loadImagePromises)
+        .then(photoImages => {
+          // Draw each photo with frame
+          photoImages.forEach((img, index) => {
+            if (!img || typeof img.width !== 'number' || typeof img.height !== 'number') {
+              console.error('Invalid image object', img);
+              return; // Skip this image
+            }
+            
+            // Calculate vertical position with offset from top matching example
+            // Ensure exact consistent spacing between photos
+            const y = topMargin + spaceBetween + index * (photoHeight + spaceBetween)
+            
+            // Draw frame first (if selected)
+            if (frame !== 'none') {
+              // Set frame color
+              ctx.fillStyle = frameStyle.borderColor
+              
+              // Draw frame with appropriate border width - always straight edges
+              // Ensure the frame is drawn with exact dimensions for consistency
+              ctx.fillRect(
+                marginX - frameStyle.borderWidth,
+                y - frameStyle.borderWidth,
+                photoWidth + frameStyle.borderWidth * 2,
+                photoHeight + frameStyle.borderWidth * 2 + (frameStyle.bottomBorder || 0)
+              )
+              
+              // Add film holes if using filmstrip frame
+              if (frameStyle.holes) {
+                const holeRadius = 6 // Smaller holes
+                const holeMargin = 8 // More margin for holes
+                // Left side holes
+                ctx.fillStyle = '#000000'
+                ctx.beginPath()
+                ctx.arc(marginX - frameStyle.borderWidth + holeMargin + holeRadius, y + photoHeight * 0.25, holeRadius, 0, Math.PI * 2)
+                ctx.arc(marginX - frameStyle.borderWidth + holeMargin + holeRadius, y + photoHeight * 0.75, holeRadius, 0, Math.PI * 2)
+                ctx.fill()
+                // Right side holes
+                ctx.beginPath()
+                ctx.arc(marginX + photoWidth + frameStyle.borderWidth - holeMargin - holeRadius, y + photoHeight * 0.25, holeRadius, 0, Math.PI * 2)
+                ctx.arc(marginX + photoWidth + frameStyle.borderWidth - holeMargin - holeRadius, y + photoHeight * 0.75, holeRadius, 0, Math.PI * 2)
+                ctx.fill()
+              }
+            }
+            
+            // Draw the image ensuring it fits properly within the frame
+            const effectiveWidth = photoWidth - 4; // Slightly smaller to avoid edge cropping
+            const effectiveHeight = photoHeight - 4;
+            
+            // Handle aspect ratio while avoiding cropping
+            const imgAspect = img.width / img.height;
+            const frameAspect = effectiveWidth / effectiveHeight;
+            
+            let drawWidth, drawHeight, offsetX, offsetY;
+            
+            if (imgAspect > frameAspect) {
+              // Image is wider - scale to fit height and center horizontally
+              drawHeight = effectiveHeight;
+              drawWidth = drawHeight * imgAspect;
+              offsetX = (effectiveWidth - drawWidth) / 2;
+              offsetY = 0;
+            } else {
+              // Image is taller - scale to fit width and center vertically
+              drawWidth = effectiveWidth;
+              drawHeight = drawWidth / imgAspect;
+              offsetX = 0;
+              offsetY = (effectiveHeight - drawHeight) / 2;
+            }
+            
+            // Draw the image centered in its frame
+            ctx.drawImage(
+              img,
+              marginX + 2 + offsetX, // 2px inner margin
+              y + 2 + offsetY,      // 2px inner margin 
+              drawWidth,
+              drawHeight
+            );
+            });
           
-          // Draw caption text
-          ctx.font = getFontStyle(fontStyle)
+          // Reset filter for text
+          ctx.filter = 'none'
+          
+          // Add a bit of extra spacing between last photo and caption area
+          const lastPhotoBottom = topMargin + spaceBetween + 3 * (photoHeight + spaceBetween) - spaceBetween;
+          const extraSpaceNeeded = Math.max(0, lastPhotoBottom + 25 - (canvas.height - captionDateAreaHeight));
+          
+          // Skip the divider line for a cleaner look like the example
+
+          // Add the date at the bottom to match example
+          const today = new Date()
+          const formattedDate = today.toLocaleDateString('en-GB', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+          })
+          
+          // Position for date and caption - moved lower
+          const dateY = canvas.height - 20;
+          const captionY = canvas.height - 55; // Raised higher from date for better spacing
+          
+          // Add caption if present (positioned below photos and above date)
+          if (caption) {
+              // Add background for better visibility of caption text
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+              ctx.fillRect(0, captionY - 30, canvas.width, 45);
+              
+            // Add subtle text shadow for better visibility
+            ctx.save();
+              ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = 2;
+              ctx.shadowOffsetY = 1;
+            
+            // Draw caption text
+            ctx.font = getFontStyle(fontStyle)
+            ctx.textAlign = 'center'
+            ctx.fillStyle = textColor
+            
+            // Handle text wrapping with slightly smaller line height
+            const maxWidth = photoWidth * 0.9
+            wrapText(ctx, caption, canvas.width / 2, captionY, maxWidth, 26)
+            
+            ctx.restore();
+          }
+            
+            // Background for date
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.fillRect(0, dateY - 15, canvas.width, 25);
+          
+          // Use a smaller handwritten cursive style font for the date
+          ctx.font = 'italic 20px "Brush Script MT", cursive';
+          ctx.fillStyle = '#8b4513' // Brown color for date
           ctx.textAlign = 'center'
-          ctx.fillStyle = textColor
+          ctx.fillText(formattedDate, canvas.width / 2, dateY)
+            
+            resolve();
+        })
+        .catch(error => {
+          console.error('Error rendering photo strip:', error);
           
-          // Handle text wrapping with slightly smaller line height
-          const maxWidth = photoWidth * 0.9
-          wrapText(ctx, caption, canvas.width / 2, captionY, maxWidth, 26)
+          // Clear the canvas and draw an error message
+          ctx.filter = 'none';
+          ctx.fillStyle = '#f9f5e7';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
           
-          ctx.restore();
-        }
-          
-          // Background for date
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-          ctx.fillRect(0, dateY - 15, canvas.width, 25);
-        
-        // Use a smaller handwritten cursive style font for the date
-        ctx.font = 'italic 20px "Brush Script MT", cursive';
-        ctx.fillStyle = '#8b4513' // Brown color for date
-        ctx.textAlign = 'center'
-        ctx.fillText(formattedDate, canvas.width / 2, dateY)
-          
-          resolve();
-      })
-      .catch(error => {
-        console.error('Error rendering photo strip:', error);
-        
-        // Clear the canvas and draw an error message
-        ctx.filter = 'none';
-        ctx.fillStyle = '#f9f5e7';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Draw error message on canvas
-        ctx.fillStyle = '#a52a2a';
-        ctx.font = 'bold 24px serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Error loading images', canvas.width / 2, canvas.height / 2 - 20);
-        ctx.font = 'italic 18px serif';
-        ctx.fillText('Please try again', canvas.width / 2, canvas.height / 2 + 20);
-          
-          reject(error);
+          // Draw error message on canvas
+          ctx.fillStyle = '#a52a2a';
+          ctx.font = 'bold 24px serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('Error loading images', canvas.width / 2, canvas.height / 2 - 20);
+          ctx.font = 'italic 18px serif';
+          ctx.fillText('Please try again', canvas.width / 2, canvas.height / 2 + 20);
+            
+            reject(error);
+          });
         });
-      });
-  }
+    }
 
   // Helper function for text wrapping
   const wrapText = (
@@ -458,13 +469,17 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
   }
 
   const downloadPhotoStrip = () => {
-    if (!canvasRef.current) return
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      console.error('Canvas not available for download');
+      return;
+    }
     
     // Create a temporary link element
     const link = document.createElement('a')
     const timestamp = new Date().toISOString().replace(/:/g, '-')
     link.download = `retrivia-memory-${timestamp}.jpg`
-    link.href = canvasRef.current.toDataURL('image/jpeg', 1.0) // Use maximum quality
+    link.href = canvas.toDataURL('image/jpeg', 1.0) // Use maximum quality
     link.click()
   }
 
@@ -511,7 +526,12 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
 
   // Add a function to save before viewing album
   const saveAndViewAlbum = async () => {
-    if (!canvasRef.current) return
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      console.error('Canvas not available for saving');
+      router.push('/photobook');
+      return;
+    }
 
     setIsSaving(true)
     
@@ -531,7 +551,7 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
       }
       
       // Get the photostrip canvas data URL with caption rendered
-      const photoStripDataUrl = canvasRef.current.toDataURL('image/jpeg', 0.95);
+      const photoStripDataUrl = canvas.toDataURL('image/jpeg', 0.95);
       
       let result = null;
       
