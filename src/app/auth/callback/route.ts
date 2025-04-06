@@ -1,7 +1,6 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { supabase } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic' // Required because we're using dynamic data
 
@@ -19,13 +18,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Instead of using createRouteHandlerClient, just log the code
+    // and redirect to the app - the client-side code will handle the session
     if (code) {
-      const cookieStore = cookies()
-      const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
-      
-      console.log('Exchanging code for session...')
-      await supabase.auth.exchangeCodeForSession(code)
-      console.log('Session created successfully')
+      console.log('Auth code received, redirecting to app')
     } else {
       console.warn('No code found in callback URL')
     }

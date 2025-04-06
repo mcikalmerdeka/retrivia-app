@@ -18,41 +18,11 @@ if (isBrowser) {
   }
 }
 
-// Create a dummy client for SSR if environment variables are missing
-export const supabase = (!supabaseUrl || !supabaseAnonKey) && !isBrowser
-  ? {
-      // Provide dummy implementations that won't break SSR
-      storage: {
-        from: () => ({
-          upload: async () => ({ data: null, error: new Error('Supabase not initialized') }),
-          getPublicUrl: () => ({ data: { publicUrl: '' } }),
-        }),
-      },
-      from: () => ({
-        select: () => ({ data: null, error: new Error('Supabase not initialized') }),
-        insert: () => ({ data: null, error: new Error('Supabase not initialized') }),
-        update: () => ({ data: null, error: new Error('Supabase not initialized') }),
-      }),
-      auth: {
-        getUser: async () => ({ data: { user: null }, error: new Error('Supabase not initialized') }),
-        signInWithOAuth: async () => ({ data: null, error: new Error('Supabase not initialized') }),
-        signOut: async () => ({ error: new Error('Supabase not initialized') }),
-        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-      },
-    } as any
-  : createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true, // Enable session persistence in browser storage
-        autoRefreshToken: true, // Automatically refresh the token
-        storageKey: 'photobooth-auth-token',
-        detectSessionInUrl: true, // Important for OAuth redirects
-        flowType: 'pkce', // More secure flow type
-      },
-      global: {
-        fetch: (...args) => fetch(...args), // Use the browser's fetch
-        headers: { 'X-Client-Info': 'photobooth-app' }, // Add custom header for tracking
-      },
-    })
+// Create a single supabase client for the entire app
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+)
 
 // Test function to check database connectivity - call this from a component
 export const testDatabaseConnection = async () => {

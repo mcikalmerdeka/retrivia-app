@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
   const { signInWithGoogle, isAuthenticated, isLoading } = useAuth()
@@ -11,6 +12,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
+  const code = searchParams.get('code')
 
   // Check for error in URL parameters (from redirect)
   useEffect(() => {
@@ -26,6 +28,27 @@ export default function LoginPage() {
       router.push('/photobook')
     }
   }, [isAuthenticated, isLoading, router])
+
+  useEffect(() => {
+    // Handle code exchange if it exists
+    const handleCode = async () => {
+      if (code) {
+        try {
+          // Exchange code for session
+          await supabase.auth.exchangeCodeForSession(code)
+          // Check if session exists
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            router.push('/photobook')
+          }
+        } catch (err) {
+          console.error('Error exchanging code for session:', err)
+        }
+      }
+    }
+    
+    handleCode()
+  }, [code, router])
 
   const handleGoogleSignIn = async () => {
     try {

@@ -1,131 +1,93 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
-import { User, AuthError, AuthResponse } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
+
+interface User {
+  id: string
+  email?: string
+}
 
 interface AuthContextType {
   user: User | null
-  isLoading: boolean
-  signInWithGoogle: () => Promise<AuthResponse>
-  signOut: () => Promise<void>
   isAuthenticated: boolean
+  isLoading: boolean
+  signInWithGoogle: () => Promise<void>
+  signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
+    // Check for existing session
+    const checkSession = async () => {
       try {
-        setIsLoading(true)
-        
-        // Check for existing user
-        const { data, error } = await supabase.auth.getUser()
-        
-        if (error) {
-          if (error.message !== 'Auth session missing!' && error.message !== 'Failed to get user') {
-            console.error('Error getting user:', error)
-          } else {
-            console.log('No active session found')
-          }
-          setUser(null)
-        } else {
-          setUser(data.user)
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user) {
+          setUser({
+            id: session.user.id,
+            email: session.user.email
+          })
         }
       } catch (error) {
-        console.error('Unexpected error during auth init:', error)
-        setUser(null)
+        console.error('Error checking session:', error)
       } finally {
         setIsLoading(false)
       }
     }
 
-    getInitialSession()
+    checkSession()
 
-    // Set up auth state change listener
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event: 'SIGNED_IN' | 'SIGNED_OUT' | 'USER_UPDATED' | 'PASSWORD_RECOVERY' | 'TOKEN_REFRESHED', 
-       session: { user: User } | null) => {
-        console.log('Auth state changed:', event)
-        setUser(session?.user ?? null)
-        
-        // Handle session changes
-        if (event === 'SIGNED_IN') {
-          console.log('User signed in')
-          router.refresh() // Refresh to update any server-side data
+      (event, session) => {
+        if (session?.user) {
+          setUser({
+            id: session.user.id,
+            email: session.user.email
+          })
+        } else {
+          setUser(null)
         }
-        
-        if (event === 'SIGNED_OUT') {
-          console.log('User signed out')
-          router.refresh() // Refresh to update any server-side data
-          router.push('/') // Redirect to home page
-        }
+        setIsLoading(false)
       }
     )
 
-    // Clean up subscription on unmount
     return () => {
       subscription.unsubscribe()
     }
-  }, [router])
+  }, [])
 
   const signInWithGoogle = async () => {
-    try {
-      console.log('Starting Google sign-in flow')
-      const response = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: typeof window !== 'undefined' 
-            ? `${window.location.origin}/auth/callback` 
-            : undefined,
-          queryParams: {
-            prompt: 'select_account' // Always show account selector
-          }
-        }
-      })
-
-      if (response.error) {
-        console.error('Error in OAuth flow:', response.error)
-        throw response.error
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/login`
       }
-
-      return response
-    } catch (error) {
-      console.error('Unexpected error during sign in:', error)
-      throw error
-    }
+    })
   }
 
   const signOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut()
-      if (error) {
-        console.error('Error signing out:', error)
-        throw error
-      }
-    } catch (error) {
-      console.error('Unexpected error during sign out:', error)
-      throw error
-    }
-  }
-
-  const value = {
-    user,
-    isLoading,
-    signInWithGoogle,
-    signOut,
-    isAuthenticated: !!user
+    await supabase.auth.signOut()
+    router.push('/login')
   }
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated: !!user,
+        isLoading,
+        signInWithGoogle,
+        signOut
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )
