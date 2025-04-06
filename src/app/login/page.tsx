@@ -55,16 +55,12 @@ export default function LoginPage() {
       setIsSigningIn(true)
       setError(null)
       
-      const { error } = await signInWithGoogle()
-      
-      if (error) {
-        console.error('Error signing in with Google:', error)
-        setError(`Failed to sign in with Google: ${error.message}`)
-      }
+      // Call signInWithGoogle without trying to destructure a return value
+      await signInWithGoogle()
+      // The redirect will happen automatically
     } catch (err: any) {
       console.error('Unexpected error during sign in:', err)
       setError(`An unexpected error occurred: ${err?.message || 'Please try again'}`)
-    } finally {
       setIsSigningIn(false)
     }
   }
