@@ -431,9 +431,16 @@ export const debugAuthState = async () => {
   }
 }
 
-// Debug function to get all sessions regardless of user (for troubleshooting)
+// Debug function to get all sessions regardless of user (for admin only)
 export const getAllSessions = async (limit = 100) => {
   try {
+    // First, check if the current user is an admin
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData?.user || userData.user.email !== 'mcikalmerdeka@gmail.com') {
+      console.error('Unauthorized access attempt to getAllSessions');
+      return []; // Return empty array for non-admin users
+    }
+    
     console.log('ADMIN DEBUG: Fetching all sessions regardless of user');
     
     const { data, error } = await supabase

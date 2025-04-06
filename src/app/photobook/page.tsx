@@ -35,12 +35,22 @@ export default function PhotobookPage() {
   const [availableDays, setAvailableDays] = useState<number[]>([]);
 
   const [debugMode, setDebugMode] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     // Initial load of sessions
     const loadWithDebug = async () => {
       const { debugAuthState } = await import('@/lib/supabase');
-      await debugAuthState();
+      const { user } = await debugAuthState();
+      
+      // Check if user is admin
+      if (user?.email === 'mcikalmerdeka@gmail.com') {
+        console.log('Admin user detected');
+        setIsAdmin(true);
+      } else {
+        setIsAdmin(false);
+      }
+      
       fetchSessions();
     };
     
@@ -183,6 +193,12 @@ export default function PhotobookPage() {
 
   // Add a debug function
   const runDebugCheck = async () => {
+    // Only run for admin user
+    if (!isAdmin) {
+      console.log('Debug mode is only available for admin users');
+      return;
+    }
+    
     console.log('Running debug checks...');
     
     // Check auth state
@@ -215,19 +231,21 @@ export default function PhotobookPage() {
             <Upload size={16} />
             Upload Photos
           </Link>
-          {/* Debug button - invisible in production */}
-          <button 
-            onClick={runDebugCheck}
-            className="vintage-button flex items-center gap-2 opacity-50 hover:opacity-100"
-            title="Troubleshoot album"
-          >
-            <RotateCcw size={16} />
-            Refresh
-          </button>
+          {/* Debug button - only visible to admin */}
+          {isAdmin && (
+            <button 
+              onClick={runDebugCheck}
+              className="vintage-button flex items-center gap-2 opacity-50 hover:opacity-100"
+              title="Troubleshoot album"
+            >
+              <RotateCcw size={16} />
+              Refresh
+            </button>
+          )}
         </div>
       </div>
       
-      {debugMode && (
+      {debugMode && isAdmin && (
         <div className="mb-4 p-2 bg-yellow-100 border border-yellow-600 rounded text-sm">
           <p className="font-semibold text-yellow-800">Debug Mode: Showing all sessions</p>
           <p>This is temporary to help troubleshoot the empty album issue.</p>
