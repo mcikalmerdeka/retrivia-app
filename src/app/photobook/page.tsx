@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Calendar, Camera, Upload } from 'lucide-react'
-import { getSavedPhotoStripSessions, updateSessionMemoryNotes } from '@/lib/supabase'
+import { ChevronLeft, Calendar, Camera, Upload, RotateCcw } from 'lucide-react'
+import { getSavedPhotoStripSessions, updateSessionMemoryNotes, getAllSessions, debugAuthState } from '@/lib/supabase'
 import Link from 'next/link'
 
 // Session type definition
@@ -34,9 +34,17 @@ export default function PhotobookPage() {
   const [availableMonths, setAvailableMonths] = useState<number[]>([]);
   const [availableDays, setAvailableDays] = useState<number[]>([]);
 
+  const [debugMode, setDebugMode] = useState(false);
+
   useEffect(() => {
     // Initial load of sessions
-    fetchSessions();
+    const loadWithDebug = async () => {
+      const { debugAuthState } = await import('@/lib/supabase');
+      await debugAuthState();
+      fetchSessions();
+    };
+    
+    loadWithDebug();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -49,13 +57,20 @@ export default function PhotobookPage() {
   const fetchSessions = async () => {
     setLoading(true);
     try {
+      // Debug: Check auth status
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Current user in photobook:', user ? `ID: ${user.id.substring(0, 8)}...` : 'Not logged in');
+      
       const dateFilter = {
         year,
         month: month || undefined,
         day: day || undefined
       };
       
+      console.log('Fetching sessions with filter:', dateFilter);
       const data = await getSavedPhotoStripSessions(100, dateFilter);
+      console.log('Session data returned:', data ? `${data.length} sessions` : 'No sessions', data);
       
       if (data && data.length > 0) {
         setSessions(data);
@@ -91,6 +106,7 @@ export default function PhotobookPage() {
         }
       } else {
         // No sessions found
+        console.log('No sessions found for the current user with the specified filters');
         setSessions([]);
         
         // Get current year
@@ -165,6 +181,27 @@ export default function PhotobookPage() {
     });
   };
 
+  // Add a debug function
+  const runDebugCheck = async () => {
+    console.log('Running debug checks...');
+    
+    // Check auth state
+    await debugAuthState();
+    
+    // Attempt to fetch all sessions as a sanity check
+    const allSessions = await getAllSessions();
+    
+    if (allSessions.length > 0) {
+      console.log(`Debug found ${allSessions.length} total sessions`);
+      
+      // Toggle debug mode to show all sessions temporarily
+      setDebugMode(true);
+      setSessions(allSessions);
+    } else {
+      console.log('No sessions found at all in the database');
+    }
+  };
+
   return (
     <div className="p-4">
       <div className="mb-6 flex justify-between items-center">
@@ -178,8 +215,33 @@ export default function PhotobookPage() {
             <Upload size={16} />
             Upload Photos
           </Link>
+          {/* Debug button - invisible in production */}
+          <button 
+            onClick={runDebugCheck}
+            className="vintage-button flex items-center gap-2 opacity-50 hover:opacity-100"
+            title="Troubleshoot album"
+          >
+            <RotateCcw size={16} />
+            Refresh
+          </button>
         </div>
       </div>
+      
+      {debugMode && (
+        <div className="mb-4 p-2 bg-yellow-100 border border-yellow-600 rounded text-sm">
+          <p className="font-semibold text-yellow-800">Debug Mode: Showing all sessions</p>
+          <p>This is temporary to help troubleshoot the empty album issue.</p>
+          <button 
+            onClick={() => {
+              setDebugMode(false);
+              fetchSessions();
+            }}
+            className="px-2 py-1 bg-yellow-200 hover:bg-yellow-300 text-yellow-800 rounded mt-1"
+          >
+            Return to normal view
+          </button>
+        </div>
+      )}
       
       {sessions.length > 0 ? (
         <div className="mb-4 flex flex-wrap gap-2">

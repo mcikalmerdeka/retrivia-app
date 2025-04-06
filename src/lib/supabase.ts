@@ -21,7 +21,14 @@ if (isBrowser) {
 // Create a single supabase client for the entire app
 export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+    }
+  }
 )
 
 // Test function to check database connectivity - call this from a component
@@ -130,10 +137,11 @@ export const savePhotoStripSession = async (
 ): Promise<{ url: string; sessionId: string } | null> => {
   try {
     // Get the current authenticated user
+    console.log('Getting user for saving photo session');
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData?.user?.id;
 
-    console.log('Saving session for user:', userId || 'anonymous');
+    console.log('Saving session for user:', userId ? `ID: ${userId.substring(0, 8)}...` : 'anonymous');
 
     // First, upload all individual photos
     const sessionTimestamp = Date.now();
@@ -149,7 +157,7 @@ export const savePhotoStripSession = async (
     );
     
     const uploadedPhotoUrls = await Promise.all(photoUploadPromises);
-    console.log('Uploaded photo URLs:', uploadedPhotoUrls);
+    console.log(`Uploaded ${uploadedPhotoUrls.filter(Boolean).length}/${photos.length} photos successfully`);
     
     // Then, upload the photostrip
     const photoStripPath = `sessions/${sessionFolder}/photostrip.jpg`;
@@ -159,11 +167,21 @@ export const savePhotoStripSession = async (
       photoStripUrl
     );
     
-    console.log('Photostrip URL:', photoStripStorageUrl);
+    console.log('Photostrip URL generated:', photoStripStorageUrl ? 'Success' : 'Failed');
     
     if (!photoStripStorageUrl) {
       console.error('Failed to upload photostrip');
       return null;
+    }
+    
+    // Double-check user is still authenticated
+    const { data: currentUser } = await supabase.auth.getUser();
+    const currentUserId = currentUser?.user?.id || null;
+    
+    if (userId && userId !== currentUserId) {
+      console.warn('User ID changed during upload process!', 
+        `Original: ${userId.substring(0, 8)}...`, 
+        `Current: ${currentUserId ? currentUserId.substring(0, 8) + '...' : 'null'}`);
     }
     
     // Prepare session data
@@ -173,13 +191,10 @@ export const savePhotoStripSession = async (
       photostrip_url: photoStripStorageUrl,
       captions: captions || '',
       memory_notes: memoryNotes || '',
-      user_id: userId, // This will be null for anonymous users
+      user_id: currentUserId, // Use the most current user ID
     };
     
-    console.log('Inserting session data:', {
-      ...sessionData,
-      photo_urls: `[${uploadedPhotoUrls.length} photos]` // Log summary instead of full URLs
-    });
+    console.log('Inserting session with user_id:', sessionData.user_id || 'null');
     
     try {
       // Insert the session data
@@ -196,6 +211,23 @@ export const savePhotoStripSession = async (
       }
       
       console.log('Successfully saved session data with ID:', data.id);
+      
+      // Verify the session was saved correctly
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('sessions')
+        .select('id, user_id')
+        .eq('id', data.id)
+        .single();
+        
+      if (verifyError) {
+        console.error('Error verifying saved session:', verifyError);
+      } else {
+        console.log('Verified session data:', {
+          id: verifyData.id,
+          user_id: verifyData.user_id || 'null'
+        });
+      }
+      
       return { url: photoStripStorageUrl, sessionId: data.id };
     } catch (dbError) {
       console.error('Exception during database operation:', dbError);
@@ -226,8 +258,10 @@ export const getSavedPhotoStripSessions = async (
     }
     
     // Get the current authenticated user
+    console.log('Getting current user in getSavedPhotoStripSessions');
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData?.user?.id;
+    console.log('Auth check for sessions:', userId ? `User ID: ${userId.substring(0, 8)}...` : 'Not authenticated');
     
     // Start building the query
     let query = supabase
@@ -238,11 +272,11 @@ export const getSavedPhotoStripSessions = async (
     // Apply user filtering if signed in
     if (userId) {
       // Only fetch sessions that belong to this user
+      console.log(`Filtering sessions for user: ${userId.substring(0, 8)}...`);
       query = query.eq('user_id', userId);
-      console.log('Filtering sessions for user:', userId);
     } else {
-      console.log('No user signed in, showing public sessions only');
-      // Only show sessions with null user_id (legacy sessions or public sessions)
+      console.log('No user signed in, showing anonymous sessions only');
+      // Only show sessions with null user_id (anonymous sessions)
       query = query.is('user_id', null);
     }
     
@@ -267,7 +301,8 @@ export const getSavedPhotoStripSessions = async (
         query = query.gte('created_at', startDate).lt('created_at', endDate);
       }
     }
-    
+
+    console.log('Executing sessions query with limit:', limit);
     // Apply limit
     query = query.limit(limit);
     
@@ -277,6 +312,18 @@ export const getSavedPhotoStripSessions = async (
     if (error) {
       console.error('Error fetching sessions:', error);
       return [];
+    }
+
+    console.log(`Query returned ${data.length} sessions`);
+    
+    // For debugging purposes, log the first session if available
+    if (data.length > 0) {
+      const firstSession = { ...data[0] };
+      if (firstSession.photo_urls) {
+        // Don't log all the URLs
+        firstSession.photo_urls = '[URLs hidden]';
+      }
+      console.log('First session:', firstSession);
     }
     
     // Process the results to handle photo_urls that might be strings
@@ -360,5 +407,59 @@ export const updateSessionMemoryNotes = async (
   } catch (error) {
     console.error('Exception in updateSessionMemoryNotes:', error);
     return false;
+  }
+}
+
+// Helper function to debug auth state
+export const debugAuthState = async () => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    console.log('Auth Debug:', {
+      hasUser: !!user,
+      hasSession: !!session,
+      userId: user?.id ? `${user.id.substring(0, 8)}...` : null,
+      email: user?.email ? `${user.email.split('@')[0]}@...` : null
+    })
+    
+    return { user, session }
+  } catch (error) {
+    console.error('Error debugging auth state:', error)
+    return { user: null, session: null }
+  }
+}
+
+// Debug function to get all sessions regardless of user (for troubleshooting)
+export const getAllSessions = async (limit = 100) => {
+  try {
+    console.log('ADMIN DEBUG: Fetching all sessions regardless of user');
+    
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+      
+    if (error) {
+      console.error('Error fetching all sessions:', error);
+      return [];
+    }
+    
+    console.log(`Found ${data.length} total sessions in database`);
+    
+    // Group by user_id for analysis
+    const sessionsByUser: Record<string, number> = {};
+    for (const session of data) {
+      const userId = session.user_id || 'anonymous';
+      sessionsByUser[userId] = (sessionsByUser[userId] || 0) + 1;
+    }
+    
+    console.log('Sessions by user:', sessionsByUser);
+    
+    return data;
+  } catch (error) {
+    console.error('Error in getAllSessions:', error);
+    return [];
   }
 } 
