@@ -26,11 +26,8 @@ export const supabase = createClient(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: false,
-      storage: isBrowser ? localStorage : undefined,
-      storageKey: 'retrivia-auth-session',
-      flowType: 'implicit',
-      debug: true
+      detectSessionInUrl: true,
+      storage: isBrowser ? localStorage : undefined
     }
   }
 )

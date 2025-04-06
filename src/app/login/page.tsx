@@ -22,45 +22,25 @@ export default function LoginPage() {
         if (errorParam) {
           console.log('Error parameter found in URL:', errorParam)
           setError(decodeURIComponent(errorParam))
-          
-          // Clear the session if there was an auth error
-          await supabase.auth.signOut({ scope: 'local' })
-          console.log('Cleared local session due to auth error')
           return
         }
         
-        // Only perform a session check if there's no error
-        await checkAuthState()
+        // Check auth state
+        console.log('Checking auth state on login page')
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (session) {
+          console.log('User is already authenticated, redirecting to photobook')
+          router.push('/photobook')
+        }
       } catch (err) {
         console.error('Error in login page initialization:', err)
       }
     }
     
     resetAuth()
-  }, [searchParams])
+  }, [searchParams, router])
   
-  // Separate function to check auth state
-  const checkAuthState = async () => {
-    console.log('Login page loaded, checking auth state')
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      console.log('Auth state on login page:', { 
-        hasUser: !!user, 
-        hasSession: !!session,
-        userId: user?.id ? user.id.substring(0, 8) + '...' : null
-      })
-      
-      if (user && session) {
-        console.log('User is already authenticated, redirecting to photobook')
-        router.push('/photobook')
-      }
-    } catch (err) {
-      console.error('Error checking auth state on login page:', err)
-    }
-  }
-
   // If already authenticated, redirect to photobook
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
