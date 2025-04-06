@@ -7,6 +7,7 @@ import FrameComponent, { FrameType } from './FrameComponent'
 import CaptionComponent, { FontStyle } from './CaptionComponent'
 import PhotoStripComponent from './PhotoStripComponent'
 import { savePhotoStripSession, uploadBase64Image } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 
 interface Photo {
   id: string
@@ -47,6 +48,9 @@ export default function PhotoboothComponent() {
 
   // Add a new state variable for the flash effect
   const [showFlash, setShowFlash] = useState(false)
+
+  // Add sessionId state
+  const [sessionId, setSessionId] = useState<string | null>(null)
 
   // Check device type and orientation
   useEffect(() => {
@@ -124,16 +128,17 @@ export default function PhotoboothComponent() {
 
   // Set up an effect to auto-save when entering customization mode
   useEffect(() => {
-    // Only attempt to auto-save if we have 3 photos and are in the customization view
-    if (showCustomization && photos.filter(photo => photo !== null).length === 3) {
-      // Wait for the PhotoStripComponent to render
+    // Only auto-save if we have photos, are in customization mode, and haven't already saved
+    if (showCustomization && photos.length === 3 && !sessionId && !saveSuccess) {
+      // Wait for the PhotoStripComponent to fully render
       const timer = setTimeout(() => {
+        console.log('Auto-saving photos to Supabase...');
         autoSaveToCloud();
-      }, 1000); // Longer delay to ensure canvas is fully rendered
+      }, 1500); // Longer delay to ensure canvas is fully rendered
       
       return () => clearTimeout(timer);
     }
-  }, [showCustomization, photos]);
+  }, [showCustomization, photos, sessionId, saveSuccess]);
 
   // Start the automatic photo capture sequence
   const startPhotoSequence = () => {
@@ -343,61 +348,80 @@ export default function PhotoboothComponent() {
     setTextColor(color)
   }
 
-  // Modify the autoSaveToCloud function to be more robust
+  // Function to auto-save the photostrip to Supabase
   const autoSaveToCloud = async () => {
     try {
-      // Make sure we have the canvas and photos
+      // Check if we have a valid canvas and photos
       if (!photoStripRef.current) {
-        console.error('Cannot auto-save photostrip: Canvas not ready')
-        return
+        console.error('Cannot auto-save: Canvas not ready');
+        return;
       }
       
-      if (photos.filter(photo => photo !== null).length < 3) {
-        console.error('Cannot auto-save photostrip: Not enough photos')
-        return
+      const filteredPhotos = photos.filter(photo => photo !== null);
+      if (filteredPhotos.length < 3) {
+        console.error('Cannot auto-save: Not enough photos');
+        return;
       }
-
+      
       // Check if already saving or saved
       if (saving || saveSuccess === true) {
-        return
+        return;
       }
-
-      setSaving(true)
+      
+      setSaving(true);
+      setSaveSuccess(null);
+      setCaptureMessage('Automatically saving your photostrip...');
+      
+      // Wait longer to ensure the canvas is fully rendered with the caption
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Force a redraw if there's a caption to ensure it's rendered
+      if (caption) {
+        // Type assertion for the canvas element with renderPhotoStrip method
+        const enhancedCanvas = photoStripRef.current as unknown as HTMLCanvasElement & { 
+          renderPhotoStrip: () => Promise<void> 
+        };
+        
+        if (typeof enhancedCanvas.renderPhotoStrip === 'function') {
+          await enhancedCanvas.renderPhotoStrip();
+          // Additional wait after rendering
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
       
       // Get the photostrip canvas data URL
-      const photoStripDataUrl = photoStripRef.current.toDataURL('image/jpeg', 0.95)
+      const photoStripDataUrl = photoStripRef.current.toDataURL('image/jpeg', 0.95);
       
-      console.log('Auto-saving photos to Supabase...')
+      console.log('Auto-saving photos to Supabase from PhotoboothComponent...');
       
       // Save the session to Supabase
-      const savedUrl = await savePhotoStripSession(
-        photos.filter(photo => photo !== null),
+      const result = await savePhotoStripSession(
+        filteredPhotos,
         photoStripDataUrl,
         caption
-      )
+      );
       
-      console.log('Auto-save completed, returned URL:', savedUrl)
+      console.log('Auto-save completed, result:', result);
       
-      if (savedUrl) {
-        setSaveSuccess(true)
-        setSavedUrl(savedUrl)
-        // Remove notification message
-        setCaptureMessage(null)
-        
-        // Removed notification code
+      if (result) {
+        setSaveSuccess(true);
+        setSavedUrl(result.url);
+        setSessionId(result.sessionId);
+        setCaptureMessage(null); // Clear the message
       } else {
-        setSaveSuccess(false)
-        setCaptureMessage('Automatic cloud save failed, but you can still download your photos.')
+        setSaveSuccess(false);
+        setCaptureMessage('Auto-save failed, but you can still customize your photostrip.');
       }
     } catch (error) {
-      console.error('Error in auto-save:', error)
-      setSaveSuccess(false)
+      console.error('Error in auto-save:', error);
+      setSaveSuccess(false);
+      setCaptureMessage('Error during auto-save, but you can still customize your photostrip.');
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
-  // Add a function to save the photostrip to Supabase
+  // Update the savePhotoStrip function to store sessionId
   const savePhotoStrip = async () => {
     try {
       if (!photoStripRef.current || photos.length < 3) {
@@ -408,27 +432,94 @@ export default function PhotoboothComponent() {
       setSaving(true)
       setSaveSuccess(null)
       
-      // Get the photostrip canvas data URL
+      // Ensure the photostrip is fully rendered with the caption
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // Get the photostrip canvas data URL with caption rendered
       const photoStripDataUrl = photoStripRef.current.toDataURL('image/jpeg', 0.95)
       
       console.log('Starting save operation with Supabase...')
       
-      // Save the session to Supabase
-      const savedUrl = await savePhotoStripSession(
-        photos,
-        photoStripDataUrl,
-        caption
-      )
-      
-      console.log('Supabase operation completed, returned URL:', savedUrl)
-      
-      if (savedUrl) {
-        setSaveSuccess(true)
-        setSavedUrl(savedUrl)
-        setCaptureMessage('Your photostrip has been saved!')
+      // Check if we already have a sessionId (from auto-save)
+      if (sessionId) {
+        console.log('Updating existing session with rendered caption:', sessionId)
+        
+        // Fetch the existing session data to get the storage path
+        const { data: sessionData, error: fetchError } = await supabase
+          .from('sessions')
+          .select('photostrip_url')
+          .eq('id', sessionId)
+          .single();
+          
+        if (fetchError || !sessionData?.photostrip_url) {
+          console.error('Error fetching existing session data:', fetchError);
+          setSaveSuccess(false);
+          setCaptureMessage('Error fetching session data.');
+          return;
+        }
+        
+        // Extract the storage path from the URL
+        const storageUrl = sessionData.photostrip_url;
+        const pathMatch = storageUrl.match(/\/storage\/v1\/object\/public\/photostrips\/(.*)/);
+        
+        if (!pathMatch || !pathMatch[1]) {
+          console.error('Could not parse storage path from URL:', storageUrl);
+          setSaveSuccess(false);
+          setCaptureMessage('Error processing photostrip URL.');
+          return;
+        }
+        
+        // Reuse the same path to update the file
+        const storagePath = decodeURIComponent(pathMatch[1]);
+        
+        console.log('Uploading updated photostrip to existing path:', storagePath);
+        const updatedUrl = await uploadBase64Image('photostrips', storagePath, photoStripDataUrl);
+        
+        if (!updatedUrl) {
+          console.error('Failed to upload updated photostrip');
+          setSaveSuccess(false);
+          setCaptureMessage('Failed to upload updated photostrip.');
+          return;
+        }
+        
+        // Update the database record with caption
+        const { data, error } = await supabase
+          .from('sessions')
+          .update({
+            captions: caption || ''
+          })
+          .eq('id', sessionId)
+          .select()
+          .single()
+          
+        if (error) {
+          console.error('Error updating session caption:', error)
+          setSaveSuccess(false)
+          setCaptureMessage('Error updating your photostrip caption.')
+        } else {
+          setSaveSuccess(true)
+          setSavedUrl(updatedUrl)
+          setCaptureMessage('Your photostrip has been updated!')
+        }
       } else {
-        setSaveSuccess(false)
-        setCaptureMessage('Failed to save your photostrip, please try again.')
+        // Get the photostrip canvas data URL for a new session
+        const result = await savePhotoStripSession(
+          photos,
+          photoStripDataUrl,
+          caption
+        )
+        
+        console.log('Supabase operation completed, returned result:', result)
+        
+        if (result) {
+          setSaveSuccess(true)
+          setSavedUrl(result.url)
+          setSessionId(result.sessionId)
+          setCaptureMessage('Your photostrip has been saved!')
+        } else {
+          setSaveSuccess(false)
+          setCaptureMessage('Failed to save your photostrip, please try again.')
+        }
       }
     } catch (error) {
       console.error('Error saving photostrip:', error)
@@ -449,6 +540,13 @@ export default function PhotoboothComponent() {
     
     // Restart camera with new facing mode (will happen in useEffect)
   }
+
+  // Add a save complete handler
+  const handleSaveComplete = () => {
+    console.log('Save completed successfully');
+    setSaveSuccess(true);
+    setCaptureMessage('Your photostrip has been saved!');
+  };
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto film-grain">
@@ -637,6 +735,8 @@ export default function PhotoboothComponent() {
                   fontStyle={fontStyle}
                   textColor={textColor}
                   canvasRef={photoStripRef}
+                  sessionId={sessionId || undefined}
+                  onSaveComplete={handleSaveComplete}
                 />
               </div>
             )}

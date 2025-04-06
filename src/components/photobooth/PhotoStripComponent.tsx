@@ -1,10 +1,13 @@
 'use client'
 
 import React, { useRef, useEffect, useState, forwardRef } from 'react'
-import { Download, Share2, MessageSquare } from 'lucide-react'
+import { Download, Share2, MessageSquare, Album, Book, Save } from 'lucide-react'
 import { FilterType } from './FilterComponent'
 import { FrameType } from './FrameComponent'
 import { FontStyle } from './CaptionComponent'
+import Link from 'next/link'
+import { updateSessionMemoryNotes, savePhotoStripSession } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 
 interface Photo {
   id: string
@@ -19,6 +22,8 @@ interface PhotoStripComponentProps {
   fontStyle: FontStyle
   textColor: string
   canvasRef?: React.RefObject<HTMLCanvasElement | null>
+  sessionId?: string
+  onSaveComplete?: () => void
 }
 
 const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentProps>(({
@@ -28,18 +33,53 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
   caption,
   fontStyle,
   textColor,
-  canvasRef: externalCanvasRef
+  canvasRef: externalCanvasRef,
+  sessionId,
+  onSaveComplete
 }: PhotoStripComponentProps, ref) => {
   const internalCanvasRef = useRef<HTMLCanvasElement>(null)
   const [memorialMessage, setMemorialMessage] = useState<string>('')
   const [showMessageModal, setShowMessageModal] = useState<boolean>(false)
   const [savedMessages, setSavedMessages] = useState<{message: string, date: string}[]>([])
+  const router = useRouter()
+  const [isSaving, setIsSaving] = useState(false)
+  const [savedUrl, setSavedUrl] = useState<string | null>(null)
 
   // Use the external ref if provided, otherwise use the internal ref
   const canvasRef = externalCanvasRef || internalCanvasRef
   
   // Forward the internal ref if no external ref was provided but a ref was passed
-  React.useImperativeHandle(ref, () => internalCanvasRef.current!, [])
+  React.useImperativeHandle(ref, () => {
+    // Return the canvas element with added methods
+    const canvas = internalCanvasRef.current!;
+    // Add the renderPhotoStrip method to the canvas
+    (canvas as any).renderPhotoStrip = () => renderPhotoStrip();
+    // Return the enhanced canvas
+    return canvas;
+  }, []);
+
+  // Fetch the stored photostrip URL when sessionId is provided
+  useEffect(() => {
+    if (sessionId && sessionId !== 'unknown') {
+      const fetchSessionData = async () => {
+        const { supabase } = await import('@/lib/supabase');
+        const { data, error } = await supabase
+          .from('sessions')
+          .select('photostrip_url')
+          .eq('id', sessionId)
+          .single();
+          
+        if (error) {
+          console.error('Error fetching session data:', error);
+        } else if (data?.photostrip_url) {
+          console.log('Retrieved existing photostrip URL:', data.photostrip_url);
+          setSavedUrl(data.photostrip_url);
+        }
+      };
+      
+      fetchSessionData();
+    }
+  }, [sessionId]);
 
   // Re-render the photostrip when props change
   useEffect(() => {
@@ -137,12 +177,19 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
     }
   }
 
-  const renderPhotoStrip = () => {
-    if (!canvasRef.current || photos.length === 0) return
+  const renderPhotoStrip = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (!canvasRef.current || photos.length === 0) {
+        reject(new Error('Canvas or photos not available'));
+        return;
+      }
 
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
-    if (!ctx) return
+      if (!ctx) {
+        reject(new Error('Cannot get canvas context'));
+        return;
+      }
 
     // Use 9:16 aspect ratio (smartphone aspect ratio)
     canvas.width = 450  // Reverted to original dimension
@@ -195,7 +242,7 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
           };
           img.src = photo.dataUrl;
         });
-      })
+        });
 
     // Process images once all are loaded
     Promise.all(loadImagePromises)
@@ -275,7 +322,7 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
             drawWidth,
             drawHeight
           );
-        })
+          });
         
         // Reset filter for text
         ctx.filter = 'none'
@@ -300,10 +347,15 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
         
         // Add caption if present (positioned below photos and above date)
         if (caption) {
+            // Add background for better visibility of caption text
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.fillRect(0, captionY - 30, canvas.width, 45);
+            
           // Add subtle text shadow for better visibility
           ctx.save();
-          ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
           ctx.shadowBlur = 2;
+            ctx.shadowOffsetY = 1;
           
           // Draw caption text
           ctx.font = getFontStyle(fontStyle)
@@ -316,12 +368,18 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
           
           ctx.restore();
         }
+          
+          // Background for date
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+          ctx.fillRect(0, dateY - 15, canvas.width, 25);
         
         // Use a smaller handwritten cursive style font for the date
         ctx.font = 'italic 20px "Brush Script MT", cursive';
         ctx.fillStyle = '#8b4513' // Brown color for date
         ctx.textAlign = 'center'
         ctx.fillText(formattedDate, canvas.width / 2, dateY)
+          
+          resolve();
       })
       .catch(error => {
         console.error('Error rendering photo strip:', error);
@@ -338,6 +396,9 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
         ctx.fillText('Error loading images', canvas.width / 2, canvas.height / 2 - 20);
         ctx.font = 'italic 18px serif';
         ctx.fillText('Please try again', canvas.width / 2, canvas.height / 2 + 20);
+          
+          reject(error);
+        });
       });
   }
 
@@ -407,7 +468,7 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
     link.click()
   }
 
-  const saveMemorialMessage = () => {
+  const saveMemorialMessage = async () => {
     if (!memorialMessage.trim()) return
     
     const newMessage = {
@@ -415,12 +476,150 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
       date: new Date().toISOString()
     }
     
+    // Add to local state first for immediate UI update
     setSavedMessages([...savedMessages, newMessage])
-    setMemorialMessage('')
-    setShowMessageModal(false)
     
-    // In a real application, you would save this to a database
-    console.log('Memorial message saved:', newMessage)
+    // Save to Supabase if we have a sessionId
+    if (sessionId) {
+      try {
+        // Format all saved messages plus the new one as a single string
+        const allMessages = [...savedMessages, newMessage]
+          .map(msg => `${msg.message}\n[${new Date(msg.date).toLocaleString()}]`)
+          .join('\n\n');
+        
+        console.log(`Attempting to save memory note for session: ${sessionId}`);
+        const success = await updateSessionMemoryNotes(sessionId, allMessages);
+        
+        if (!success) {
+          console.error('Failed to save memory note to cloud - will keep local copy only');
+          // Still allow the user to continue with the local copy
+        } else {
+          console.log('Memory note saved successfully to cloud');
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('Error saving memory note:', errorMessage);
+        // Continue with the local copy even if cloud save fails
+      }
+    } else {
+      console.log('No sessionId available, memory note saved only locally');
+    }
+    
+    setMemorialMessage('');
+    setShowMessageModal(false);
+  }
+
+  // Add a function to save before viewing album
+  const saveAndViewAlbum = async () => {
+    if (!canvasRef.current) return
+
+    setIsSaving(true)
+    
+    try {
+      // Make sure the canvas is fully rendered with all customizations
+      await renderPhotoStrip();
+      
+      // Wait a moment to ensure rendering is complete
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // Force a redraw to ensure caption is rendered
+      if (caption) {
+        console.log("Ensuring caption is rendered on photostrip:", caption);
+        await renderPhotoStrip();
+        // Double-check with extra wait time
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // Get the photostrip canvas data URL with caption rendered
+      const photoStripDataUrl = canvasRef.current.toDataURL('image/jpeg', 0.95);
+      
+      let result = null;
+      
+      if (sessionId && sessionId !== 'unknown') {
+        // Update existing session data in database but reuse same storage location
+        console.log('Updating existing session with rendered caption for sessionId:', sessionId);
+        
+        // Fetch the existing session data to get the storage path
+        const { supabase } = await import('@/lib/supabase');
+        const { data: sessionData, error: fetchError } = await supabase
+          .from('sessions')
+          .select('photostrip_url')
+          .eq('id', sessionId)
+          .single();
+          
+        if (fetchError || !sessionData?.photostrip_url) {
+          console.error('Error fetching existing session data:', fetchError);
+          throw new Error('Could not fetch session data');
+        }
+        
+        // Extract the storage path from the URL
+        const storageUrl = sessionData.photostrip_url;
+        const pathMatch = storageUrl.match(/\/storage\/v1\/object\/public\/photostrips\/(.*)/);
+        
+        if (!pathMatch || !pathMatch[1]) {
+          console.error('Could not parse storage path from URL:', storageUrl);
+          throw new Error('Invalid storage URL format');
+        }
+        
+        // Reuse the same path to update the file
+        const { uploadBase64Image } = await import('@/lib/supabase');
+        const storagePath = decodeURIComponent(pathMatch[1]);
+        
+        console.log('Uploading updated photostrip to existing path:', storagePath);
+        const updatedUrl = await uploadBase64Image('photostrips', storagePath, photoStripDataUrl);
+        
+        if (!updatedUrl) {
+          console.error('Failed to upload updated photostrip');
+          throw new Error('Upload failed');
+        }
+        
+        // Update the database record with caption
+        const { error } = await supabase
+          .from('sessions')
+          .update({ 
+            captions: caption,
+            memory_notes: savedMessages.map(msg => `${msg.message}\n[${new Date(msg.date).toLocaleString()}]`).join('\n\n')
+          })
+          .eq('id', sessionId);
+          
+        if (error) {
+          console.error('Error updating photostrip caption:', error);
+        } else {
+          console.log('Successfully updated photostrip with caption');
+          result = { url: updatedUrl, sessionId };
+          setSavedUrl(updatedUrl);
+        }
+      } else {
+        // No existing session, create a new one
+        console.log('Creating new session with caption:', caption);
+        
+        result = await savePhotoStripSession(
+          photos,
+          photoStripDataUrl,
+          caption,
+          savedMessages.map(msg => `${msg.message}\n[${new Date(msg.date).toLocaleString()}]`).join('\n\n')
+        );
+        
+        console.log('Save result:', result);
+        if (result?.url) {
+          setSavedUrl(result.url);
+        }
+      }
+      
+      // Notify parent component of save completion if needed
+      if (onSaveComplete && result) {
+        onSaveComplete();
+      }
+      
+      // Navigate to photobook
+      router.push('/photobook');
+    } catch (error) {
+      console.error('Error saving photostrip:', error);
+      alert('Error saving your photostrip. Proceeding to album view anyway.');
+      router.push('/photobook');
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -449,11 +648,12 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
         </button>
         
         <button 
-          onClick={() => alert('Sharing coming soon!')}
-          className="px-6 py-3 border border-vintage-primary text-vintage-primary rounded-lg flex items-center gap-2"
+          onClick={saveAndViewAlbum}
+          disabled={isSaving}
+          className="px-6 py-3 border border-vintage-primary text-vintage-primary rounded-lg flex items-center gap-2 hover:bg-vintage-primary hover:text-white transition-colors"
         >
-          <Share2 className="w-4 h-4" />
-          Share
+          <Save className="w-4 h-4 mr-1" />
+          {isSaving ? 'Saving...' : 'Save & View Album'}
         </button>
       </div>
       
