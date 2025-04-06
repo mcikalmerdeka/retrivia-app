@@ -121,7 +121,7 @@ function dataURLtoBlob(dataUrl: string): Blob {
   return new Blob([u8arr], { type: mime })
 }
 
-// Function to save a photostrip session in Supabase - simplified version
+// Function to save a photostrip session in Supabase
 export const savePhotoStripSession = async (
   photos: { id: string | number, dataUrl: string }[],
   photoStripUrl: string,
@@ -133,41 +133,38 @@ export const savePhotoStripSession = async (
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData?.user?.id;
 
-    if (!userId) {
-      console.warn('No authenticated user found when saving session');
-      // Continue without user_id for backward compatibility
-    }
+    console.log('Saving session for user:', userId || 'anonymous');
 
     // First, upload all individual photos
+    const sessionTimestamp = Date.now();
+    const userFolder = userId ? `user_${userId}` : 'anonymous';
+    const sessionFolder = `${userFolder}/${sessionTimestamp}`;
+    
     const photoUploadPromises = photos.map((photo, index) => 
       uploadBase64Image(
         'photostrips',
-        `sessions/${Date.now()}_${index}/photo_${index}.jpg`,
+        `sessions/${sessionFolder}/photo_${index}.jpg`,
         photo.dataUrl
       )
-    )
+    );
     
-    const uploadedPhotoUrls = await Promise.all(photoUploadPromises)
-    console.log('Uploaded photo URLs:', uploadedPhotoUrls)
+    const uploadedPhotoUrls = await Promise.all(photoUploadPromises);
+    console.log('Uploaded photo URLs:', uploadedPhotoUrls);
     
     // Then, upload the photostrip
-    const sessionTimestamp = Date.now()
-    const photoStripPath = `sessions/${sessionTimestamp}/photostrip.jpg`
+    const photoStripPath = `sessions/${sessionFolder}/photostrip.jpg`;
     const photoStripStorageUrl = await uploadBase64Image(
       'photostrips', 
       photoStripPath, 
       photoStripUrl
-    )
+    );
     
-    console.log('Photostrip URL:', photoStripStorageUrl)
+    console.log('Photostrip URL:', photoStripStorageUrl);
     
     if (!photoStripStorageUrl) {
-      console.error('Failed to upload photostrip')
-      return null
+      console.error('Failed to upload photostrip');
+      return null;
     }
-    
-    // ---- DIRECT APPROACH: Insert all data at once ----
-    console.log('Inserting session data:', captions ? `Caption: ${captions}` : 'No caption')
     
     // Prepare session data
     const sessionData = {
@@ -176,32 +173,37 @@ export const savePhotoStripSession = async (
       photostrip_url: photoStripStorageUrl,
       captions: captions || '',
       memory_notes: memoryNotes || '',
-      user_id: userId || null, // Add user_id if available
-    }
+      user_id: userId, // This will be null for anonymous users
+    };
+    
+    console.log('Inserting session data:', {
+      ...sessionData,
+      photo_urls: `[${uploadedPhotoUrls.length} photos]` // Log summary instead of full URLs
+    });
     
     try {
-      // Single direct insert with all data
+      // Insert the session data
       const { data, error } = await supabase
         .from('sessions')
         .insert(sessionData)
         .select('id')
-        .single()
+        .single();
       
       if (error) {
-        console.error('Database insert error:', error.message, error.details, error.hint)
+        console.error('Database insert error:', error.message, error.details, error.hint);
         // Even if DB insert fails, return the photostrip URL since images are saved
-        return { url: photoStripStorageUrl, sessionId: 'unknown' }
+        return { url: photoStripStorageUrl, sessionId: 'unknown' };
       }
       
-      console.log('Successfully saved session data with ID:', data.id)
-      return { url: photoStripStorageUrl, sessionId: data.id }
+      console.log('Successfully saved session data with ID:', data.id);
+      return { url: photoStripStorageUrl, sessionId: data.id };
     } catch (dbError) {
-      console.error('Exception during database operation:', dbError)
-      return { url: photoStripStorageUrl, sessionId: 'unknown' } // Return URL even if DB insertion fails
+      console.error('Exception during database operation:', dbError);
+      return { url: photoStripStorageUrl, sessionId: 'unknown' }; // Return URL even if DB insertion fails
     }
   } catch (error) {
-    console.error('Error in savePhotoStripSession:', error)
-    return null
+    console.error('Error in savePhotoStripSession:', error);
+    return null;
   }
 }
 
@@ -233,13 +235,14 @@ export const getSavedPhotoStripSessions = async (
       .select('*')
       .order('created_at', { ascending: false });
     
-    // Apply user filtering if signed in, otherwise show all sessions for backward compatibility
+    // Apply user filtering if signed in
     if (userId) {
+      // Only fetch sessions that belong to this user
       query = query.eq('user_id', userId);
       console.log('Filtering sessions for user:', userId);
     } else {
-      console.log('No user signed in, showing all sessions or sessions without user_id');
-      // For backward compatibility, also show sessions with null user_id
+      console.log('No user signed in, showing public sessions only');
+      // Only show sessions with null user_id (legacy sessions or public sessions)
       query = query.is('user_id', null);
     }
     
@@ -248,42 +251,58 @@ export const getSavedPhotoStripSessions = async (
       const { year, month, day } = dateFilter;
       
       if (year && month && day) {
-        // Filter by specific day
+        // Filter by specific date
         const startDate = new Date(year, month - 1, day).toISOString();
         const endDate = new Date(year, month - 1, day + 1).toISOString();
         query = query.gte('created_at', startDate).lt('created_at', endDate);
       } else if (year && month) {
-        // Filter by specific month
+        // Filter by month
         const startDate = new Date(year, month - 1, 1).toISOString();
-        const endDate = new Date(year, month, 0).toISOString();
-        query = query.gte('created_at', startDate).lte('created_at', endDate);
+        const endDate = new Date(year, month, 1).toISOString();
+        query = query.gte('created_at', startDate).lt('created_at', endDate);
       } else if (year) {
-        // Filter by specific year
+        // Filter by year
         const startDate = new Date(year, 0, 1).toISOString();
-        const endDate = new Date(year + 1, 0, 0).toISOString();
-        query = query.gte('created_at', startDate).lte('created_at', endDate);
+        const endDate = new Date(year + 1, 0, 1).toISOString();
+        query = query.gte('created_at', startDate).lt('created_at', endDate);
       }
     }
     
-    const { data, error } = await query.limit(limit);
+    // Apply limit
+    query = query.limit(limit);
+    
+    // Execute query
+    const { data, error } = await query;
     
     if (error) {
-      console.error('Error fetching sessions:', error)
-      return null
+      console.error('Error fetching sessions:', error);
+      return [];
     }
     
-    // Parse the photo_urls JSON strings back to arrays
-    const sessionsWithParsedUrls = data.map((session: SessionRecord) => ({
-      ...session,
-      photo_urls: typeof session.photo_urls === 'string' 
-        ? JSON.parse(session.photo_urls) 
-        : session.photo_urls
-    }))
+    // Process the results to handle photo_urls that might be strings
+    const processedData = data.map((session: SessionRecord) => {
+      // Make sure photo_urls is an array
+      let photoUrls: string[] = [];
+      if (typeof session.photo_urls === 'string') {
+        try {
+          photoUrls = JSON.parse(session.photo_urls);
+        } catch (e) {
+          console.error('Error parsing photo_urls:', e);
+        }
+      } else if (Array.isArray(session.photo_urls)) {
+        photoUrls = session.photo_urls;
+      }
+      
+      return {
+        ...session,
+        photo_urls: photoUrls
+      };
+    });
     
-    return sessionsWithParsedUrls
+    return processedData;
   } catch (error) {
-    console.error('Error in getSavedPhotoStripSessions:', error)
-    return null
+    console.error('Error in getSavedPhotoStripSessions:', error);
+    return [];
   }
 }
 
@@ -294,37 +313,31 @@ export const updateSessionMemoryNotes = async (
   caption?: string
 ): Promise<boolean> => {
   try {
-    console.log(`Updating session ${sessionId} with memory notes and${caption ? ' caption' : ''}:`, 
-      memoryNotes.substring(0, 100) + (memoryNotes.length > 100 ? '...' : ''),
-      caption ? `Caption: ${caption}` : '');
-    
     // Get the current authenticated user
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData?.user?.id;
-    
-    // First, verify session ownership if user is authenticated
-    if (userId) {
-      const { data: sessionData, error: sessionError } = await supabase
-        .from('sessions')
-        .select('user_id')
-        .eq('id', sessionId)
-        .single();
-      
-      if (sessionError) {
-        console.error('Error fetching session for ownership check:', sessionError);
-        return false;
-      }
-      
-      // For sessions created after auth was added, verify user owns the session
-      if (sessionData.user_id && sessionData.user_id !== userId) {
-        console.error('User does not own this session. Update denied.');
-        return false;
-      }
+
+    // First, check if this session belongs to the current user
+    const { data: sessionData, error: fetchError } = await supabase
+      .from('sessions')
+      .select('user_id')
+      .eq('id', sessionId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching session:', fetchError);
+      return false;
     }
-    
-    // Prepare update data based on what's provided
-    const updateData: { memory_notes: string, captions?: string } = { 
-      memory_notes: memoryNotes 
+
+    // If session has a user_id and it doesn't match the current user, deny access
+    if (sessionData.user_id && sessionData.user_id !== userId) {
+      console.error('Permission denied: Users can only modify their own sessions');
+      return false;
+    }
+
+    // Prepare update data
+    const updateData: { memory_notes: string; captions?: string } = {
+      memory_notes: memoryNotes
     };
     
     // Add caption to update if provided
@@ -332,21 +345,20 @@ export const updateSessionMemoryNotes = async (
       updateData.captions = caption;
     }
     
+    // Update the session
     const { error } = await supabase
       .from('sessions')
       .update(updateData)
       .eq('id', sessionId);
     
     if (error) {
-      console.error('Error updating session data:', error.message, error.details, error.hint);
+      console.error('Error updating session memory notes:', error);
       return false;
     }
     
-    console.log('Session data updated successfully');
     return true;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('Exception updating session data:', errorMessage);
+    console.error('Exception in updateSessionMemoryNotes:', error);
     return false;
   }
 } 

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Calendar } from 'lucide-react'
+import { ChevronLeft, Calendar, Camera, Upload } from 'lucide-react'
 import { getSavedPhotoStripSessions, updateSessionMemoryNotes } from '@/lib/supabase'
 import Link from 'next/link'
 
@@ -36,17 +36,17 @@ export default function PhotobookPage() {
 
   useEffect(() => {
     // Initial load of sessions
-    loadSessions();
+    fetchSessions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     // Load sessions when date filters change
-    loadSessions();
+    fetchSessions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, month, day]);
 
-  const loadSessions = async () => {
+  const fetchSessions = async () => {
     setLoading(true);
     try {
       const dateFilter = {
@@ -57,7 +57,7 @@ export default function PhotobookPage() {
       
       const data = await getSavedPhotoStripSessions(100, dateFilter);
       
-      if (data) {
+      if (data && data.length > 0) {
         setSessions(data);
         
         // Extract unique years, months, and days for filters
@@ -90,10 +90,24 @@ export default function PhotobookPage() {
           setAvailableDays(daysInMonth);
         }
       } else {
+        // No sessions found
         setSessions([]);
+        
+        // Get current year
+        const currentYear = new Date().getFullYear();
+        setAvailableYears([currentYear]);
+        setAvailableMonths([]);
+        setAvailableDays([]);
+        
+        // Reset filters if they were set
+        if (month || day) {
+          setMonth(null);
+          setDay(null);
+        }
       }
     } catch (error) {
       console.error('Error loading sessions:', error);
+      setSessions([]);
     } finally {
       setLoading(false);
     }
@@ -153,44 +167,65 @@ export default function PhotobookPage() {
 
   return (
     <div className="p-4">
-      <div className="mb-4 flex flex-wrap gap-2">
-        {/* Year filter */}
-        <select
-          value={year}
-          onChange={(e) => handleYearChange(Number(e.target.value))}
-        >
-          {availableYears.map(y => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
-        
-        {/* Month filter */}
-        <select
-          value={month || ''}
-          onChange={(e) => handleMonthChange(e.target.value ? Number(e.target.value) : null)}
-        >
-          <option value="">All</option>
-          {availableMonths.map(m => (
-            <option key={m} value={m}>{new Date(0, m - 1).toLocaleString('default', { month: 'short' })}</option>
-          ))}
-        </select>
-        
-        {/* Day filter */}
-        <select
-          value={day || ''}
-          onChange={(e) => handleDayChange(e.target.value ? Number(e.target.value) : null)}
-        >
-          <option value="">All</option>
-          {availableDays.map(d => (
-            <option key={d} value={d}>{d}</option>
-          ))}
-        </select>
+      <div className="mb-6 flex justify-between items-center">
+        <h1 className="text-2xl font-vintage text-vintage-sepia">Your Memories</h1>
+        <div className="flex space-x-4">
+          <Link href="/photobooth" className="vintage-button flex items-center gap-2">
+            <Camera size={16} />
+            Create New
+          </Link>
+          <Link href="/upload" className="vintage-button flex items-center gap-2">
+            <Upload size={16} />
+            Upload Photos
+          </Link>
+        </div>
       </div>
+      
+      {sessions.length > 0 ? (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {/* Year filter */}
+          <select
+            value={year}
+            onChange={(e) => handleYearChange(Number(e.target.value))}
+            className="px-3 py-2 border border-vintage-sepia rounded bg-vintage-paper text-vintage-text"
+          >
+            {availableYears.map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          
+          {/* Month filter */}
+          <select
+            value={month || ''}
+            onChange={(e) => handleMonthChange(e.target.value ? Number(e.target.value) : null)}
+            className="px-3 py-2 border border-vintage-sepia rounded bg-vintage-paper text-vintage-text"
+            disabled={availableMonths.length === 0}
+          >
+            <option value="">All Months</option>
+            {availableMonths.map(m => (
+              <option key={m} value={m}>{new Date(0, m - 1).toLocaleString('default', { month: 'long' })}</option>
+            ))}
+          </select>
+          
+          {/* Day filter */}
+          <select
+            value={day || ''}
+            onChange={(e) => handleDayChange(e.target.value ? Number(e.target.value) : null)}
+            className="px-3 py-2 border border-vintage-sepia rounded bg-vintage-paper text-vintage-text"
+            disabled={availableDays.length === 0}
+          >
+            <option value="">All Days</option>
+            {availableDays.map(d => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        </div>
+      ) : null}
 
       {/* Sessions display */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         {loading ? (
-          <div className="text-center py-8">
+          <div className="col-span-full text-center py-16">
             <div className="text-xl font-vintage text-vintage-sepia animate-pulse">
               Loading your memories...
             </div>
@@ -214,17 +249,30 @@ export default function PhotobookPage() {
                 />
                 <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-30 text-white text-xs p-2">
                   {formatDate(session.created_at)}
+                  {session.captions && (
+                    <div className="mt-1 truncate">{session.captions}</div>
+                  )}
                 </div>
               </div>
             </div>
           ))
         ) : (
-          <div className="text-center py-8 border-2 border-dashed border-vintage-sepia rounded-lg">
-            <div className="text-xl font-vintage text-vintage-sepia">
-              No photostrips found for this date range
+          <div className="col-span-full text-center py-16 border-2 border-dashed border-vintage-sepia rounded-lg">
+            <div className="text-xl font-vintage text-vintage-sepia mb-4">
+              Your album is empty
             </div>
-            <div className="mt-2 text-vintage-text">
-              Try selecting a different time period or create new memories
+            <div className="mb-8 text-vintage-text">
+              Time to create some memories! Take photos or upload your favorites.
+            </div>
+            <div className="flex flex-col sm:flex-row justify-center gap-4">
+              <Link href="/photobooth" className="vintage-button flex items-center justify-center gap-2">
+                <Camera size={16} />
+                Take Photos
+              </Link>
+              <Link href="/upload" className="vintage-button flex items-center justify-center gap-2">
+                <Upload size={16} />
+                Upload Photos
+              </Link>
             </div>
           </div>
         )}
