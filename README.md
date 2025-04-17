@@ -24,6 +24,10 @@
 
 ## Getting Started
 
+You can try Retrivia Memory directly at [https://retrivia-memory.vercel.app/](https://retrivia-memory.vercel.app/)
+
+Or set up your local development environment:
+
 1. Clone the repository
 2. Install dependencies:
    ```bash
