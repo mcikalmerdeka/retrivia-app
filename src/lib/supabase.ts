@@ -1,151 +1,101 @@
-import { createClient } from '@supabase/supabase-js'
+import { Pool } from '@neondatabase/serverless'
 
-// Check if we're running on the client side
-const isBrowser = typeof window !== 'undefined'
+// Check if we're running on the server side (Neon only works server-side)
+const isServer = typeof window === 'undefined'
 
 // Get environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const databaseUrl = process.env.DATABASE_URL || ''
 
-// Only log in browser environment to avoid build errors
-if (isBrowser) {
-  // Log environment variables for debugging (only display part of the key for security)
-  console.log('Supabase URL:', supabaseUrl)
-  console.log('Supabase Key (first 5 chars):', supabaseAnonKey ? supabaseAnonKey.substring(0, 5) + '...' : 'missing')
+// Create a single pool for the entire app (server-side only)
+let pool: Pool | null = null
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('Missing Supabase environment variables')
+const getPool = () => {
+  if (!isServer) {
+    throw new Error('Database operations can only be performed server-side')
   }
-}
-
-// Create a custom storage wrapper to handle JSON parse errors
-const createSafeStorage = () => {
-  if (!isBrowser) return undefined
   
+  if (!pool && databaseUrl) {
+    pool = new Pool({ connectionString: databaseUrl })
+  }
+  return pool
+}
+
+// Create a mock supabase client for client-side compatibility
+// All actual database operations will happen through API routes
+const createMockSupabaseClient = () => {
   return {
-    getItem: (key: string) => {
-      try {
-        const item = localStorage.getItem(key)
-        if (!item) return null
-        // Validate JSON before returning
-        JSON.parse(item)
-        return item
-      } catch (e) {
-        console.warn(`Failed to parse localStorage key "${key}", removing corrupted data`)
-        localStorage.removeItem(key)
-        return null
-      }
+    auth: {
+      getUser: async () => ({ data: { user: null }, error: null }),
+      getSession: async () => ({ data: { session: null }, error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      signInWithOAuth: async () => ({ data: { url: null }, error: new Error('Auth not configured') }),
+      signOut: async () => ({ error: null }),
     },
-    setItem: (key: string, value: string) => {
-      try {
-        localStorage.setItem(key, value)
-      } catch (e) {
-        console.error(`Failed to set localStorage key "${key}":`, e)
-      }
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: async () => ({ data: null, error: null }),
+        }),
+        order: () => ({
+          limit: () => ({
+            then: async () => ({ data: [], error: null }),
+          }),
+        }),
+      }),
+      insert: () => ({
+        select: () => ({
+          single: async () => ({ data: null, error: null }),
+        }),
+      }),
+      update: () => ({
+        eq: () => ({
+          select: () => ({
+            single: async () => ({ data: null, error: null }),
+          }),
+        }),
+      }),
+    }),
+    storage: {
+      from: () => ({
+        upload: async () => ({ data: null, error: null }),
+        getPublicUrl: () => ({ data: { publicUrl: '' } }),
+      }),
     },
-    removeItem: (key: string) => {
-      try {
-        localStorage.removeItem(key)
-      } catch (e) {
-        console.error(`Failed to remove localStorage key "${key}":`, e)
-      }
-    }
   }
 }
 
-// Create a single supabase client for the entire app
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      storage: createSafeStorage()
-    }
-  }
-)
+// Export the supabase client (mock on client, real pool on server)
+export const supabase = isServer ? (getPool() as any) : createMockSupabaseClient()
 
-// Test function to check database connectivity - call this from a component
+// Test function to check database connectivity
 export const testDatabaseConnection = async () => {
   try {
+    if (!isServer) {
+      // On client side, make an API call
+      const response = await fetch('/api/test-db')
+      return await response.json()
+    }
+    
     console.log('Testing database connection...')
     
-    // Try a simple select query to verify connection
-    const { data, error, count } = await supabase
-      .from('sessions')
-      .select('*', { count: 'exact', head: true })
+    const dbPool = getPool()
+    if (!dbPool) {
+      throw new Error('Database pool not initialized - check DATABASE_URL')
+    }
     
-    if (error) {
-      console.error('Database test failed:', error)
-      return { success: false, error }
-    } else {
-      console.log('Database test successful!')
-      return { 
-        success: true, 
-        message: 'Connection successful',
-        count: count || 0
-      }
-    }
-  } catch (error) {
-    console.error('Database test threw exception:', error)
-    return { success: false, error }
-  }
-}
-
-// Function to upload an image to Supabase Storage
-export const uploadImage = async (
-  bucketName: string,
-  filePath: string,
-  file: File | Blob | string,
-  contentType?: string
-): Promise<string | null> => {
-  try {
-    // Convert base64 data URL to Blob if necessary
-    let fileBlob: File | Blob = file instanceof Blob ? file : new Blob([])
-    if (typeof file === 'string' && file.startsWith('data:')) {
-      fileBlob = dataURLtoBlob(file)
-    }
-
-    const { data, error } = await supabase.storage
-      .from(bucketName)
-      .upload(filePath, fileBlob, {
-        contentType: contentType || 'image/jpeg',
-        upsert: true,
-      })
-
-    if (error) {
-      console.error('Error uploading image:', error)
-      return null
-    }
-
-    // Get the public URL
-    const { data: publicUrlData } = supabase.storage
-      .from(bucketName)
-      .getPublicUrl(filePath)
-
-    return publicUrlData.publicUrl
-  } catch (error) {
-    console.error('Error in uploadImage:', error)
-    return null
-  }
-}
-
-// Function to upload a base64 image to Supabase Storage
-export const uploadBase64Image = async (
-  bucketName: string,
-  filePath: string,
-  base64DataUrl: string
-): Promise<string | null> => {
-  try {
-    // Convert base64 data URL to Blob
-    const blob = dataURLtoBlob(base64DataUrl)
+    const client = await dbPool.connect()
+    const result = await client.query('SELECT NOW()')
+    client.release()
     
-    return await uploadImage(bucketName, filePath, blob)
-  } catch (error) {
-    console.error('Error in uploadBase64Image:', error)
-    return null
+    console.log('Database test successful!')
+    return { 
+      success: true, 
+      message: 'Connection successful',
+      timestamp: result.rows[0].now
+    }
+  } catch (error: any) {
+    console.error('Database test failed:', error)
+    return { success: false, error: error.message }
   }
 }
 
@@ -164,7 +114,53 @@ function dataURLtoBlob(dataUrl: string): Blob {
   return new Blob([u8arr], { type: mime })
 }
 
-// Function to save a photostrip session in Supabase
+// Helper function to convert Blob to base64
+async function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
+// Function to upload an image (stores in database as base64 for now)
+export const uploadImage = async (
+  bucketName: string,
+  filePath: string,
+  file: File | Blob | string,
+  contentType?: string
+): Promise<string | null> => {
+  try {
+    // For now, return the data URL directly
+    // In production, you should use Cloudinary, AWS S3, or Vercel Blob
+    if (typeof file === 'string') {
+      return file
+    }
+    return await blobToBase64(file)
+  } catch (error) {
+    console.error('Error uploading image:', error)
+    return null
+  }
+}
+
+// Function to upload a base64 image
+export const uploadBase64Image = async (
+  bucketName: string,
+  filePath: string,
+  base64DataUrl: string
+): Promise<string | null> => {
+  try {
+    // Return the base64 data URL directly
+    // In production, upload to Cloudinary/S3 and return the URL
+    return base64DataUrl
+  } catch (error) {
+    console.error('Error in uploadBase64Image:', error)
+    return null
+  }
+}
+
+// Function to save a photostrip session
 export const savePhotoStripSession = async (
   photos: { id: string | number, dataUrl: string }[],
   photoStripUrl: string,
@@ -172,106 +168,53 @@ export const savePhotoStripSession = async (
   memoryNotes?: string
 ): Promise<{ url: string; sessionId: string } | null> => {
   try {
-    // Get the current authenticated user
-    console.log('Getting user for saving photo session');
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData?.user?.id;
-
-    console.log('Saving session for user:', userId ? `ID: ${userId.substring(0, 8)}...` : 'anonymous');
-
-    // First, upload all individual photos
-    const sessionTimestamp = Date.now();
-    const userFolder = userId ? `user_${userId}` : 'anonymous';
-    const sessionFolder = `${userFolder}/${sessionTimestamp}`;
-    
-    const photoUploadPromises = photos.map((photo, index) => 
-      uploadBase64Image(
-        'photostrips',
-        `sessions/${sessionFolder}/photo_${index}.jpg`,
-        photo.dataUrl
-      )
-    );
-    
-    const uploadedPhotoUrls = await Promise.all(photoUploadPromises);
-    console.log(`Uploaded ${uploadedPhotoUrls.filter(Boolean).length}/${photos.length} photos successfully`);
-    
-    // Then, upload the photostrip
-    const photoStripPath = `sessions/${sessionFolder}/photostrip.jpg`;
-    const photoStripStorageUrl = await uploadBase64Image(
-      'photostrips', 
-      photoStripPath, 
-      photoStripUrl
-    );
-    
-    console.log('Photostrip URL generated:', photoStripStorageUrl ? 'Success' : 'Failed');
-    
-    if (!photoStripStorageUrl) {
-      console.error('Failed to upload photostrip');
-      return null;
+    if (!isServer) {
+      // On client side, make an API call
+      const response = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          photos,
+          photoStripUrl,
+          captions,
+          memoryNotes
+        })
+      })
+      return await response.json()
     }
     
-    // Double-check user is still authenticated
-    const { data: currentUser } = await supabase.auth.getUser();
-    const currentUserId = currentUser?.user?.id || null;
-    
-    if (userId && userId !== currentUserId) {
-      console.warn('User ID changed during upload process!', 
-        `Original: ${userId.substring(0, 8)}...`, 
-        `Current: ${currentUserId ? currentUserId.substring(0, 8) + '...' : 'null'}`);
+    const dbPool = getPool()
+    if (!dbPool) {
+      throw new Error('Database pool not initialized')
     }
     
-    // Prepare session data
-    const sessionData = {
-      created_at: new Date().toISOString(),
-      photo_urls: JSON.stringify(uploadedPhotoUrls.filter(Boolean)),
-      photostrip_url: photoStripStorageUrl,
-      captions: captions || '',
-      memory_notes: memoryNotes || '',
-      user_id: currentUserId, // Use the most current user ID
-    };
-    
-    console.log('Inserting session with user_id:', sessionData.user_id || 'null');
+    const client = await dbPool.connect()
     
     try {
       // Insert the session data
-      const { data, error } = await supabase
-        .from('sessions')
-        .insert(sessionData)
-        .select('id')
-        .single();
+      const result = await client.query(
+        `INSERT INTO sessions (created_at, photo_urls, photostrip_url, captions, memory_notes) 
+         VALUES ($1, $2, $3, $4, $5) 
+         RETURNING id`,
+        [
+          new Date().toISOString(),
+          JSON.stringify(photos.map(p => p.dataUrl)),
+          photoStripUrl,
+          captions || '',
+          memoryNotes || ''
+        ]
+      )
       
-      if (error) {
-        console.error('Database insert error:', error.message, error.details, error.hint);
-        // Even if DB insert fails, return the photostrip URL since images are saved
-        return { url: photoStripStorageUrl, sessionId: 'unknown' };
-      }
+      const sessionId = result.rows[0].id
+      console.log('Successfully saved session data with ID:', sessionId)
       
-      console.log('Successfully saved session data with ID:', data.id);
-      
-      // Verify the session was saved correctly
-      const { data: verifyData, error: verifyError } = await supabase
-        .from('sessions')
-        .select('id, user_id')
-        .eq('id', data.id)
-        .single();
-        
-      if (verifyError) {
-        console.error('Error verifying saved session:', verifyError);
-      } else {
-        console.log('Verified session data:', {
-          id: verifyData.id,
-          user_id: verifyData.user_id || 'null'
-        });
-      }
-      
-      return { url: photoStripStorageUrl, sessionId: data.id };
-    } catch (dbError) {
-      console.error('Exception during database operation:', dbError);
-      return { url: photoStripStorageUrl, sessionId: 'unknown' }; // Return URL even if DB insertion fails
+      return { url: photoStripUrl, sessionId }
+    } finally {
+      client.release()
     }
   } catch (error) {
-    console.error('Error in savePhotoStripSession:', error);
-    return null;
+    console.error('Error in savePhotoStripSession:', error)
+    return null
   }
 }
 
@@ -281,111 +224,85 @@ export const getSavedPhotoStripSessions = async (
   dateFilter?: { year?: number, month?: number, day?: number }
 ) => {
   try {
-    // Define session interface to avoid 'any' type
-    interface SessionRecord {
-      id: string;
-      created_at: string;
-      photo_urls: string | string[];
-      photostrip_url: string;
-      captions: string;
-      memory_notes?: string;
-      user_id?: string;
-      [key: string]: any; // Allow other properties
-    }
-    
-    // Get the current authenticated user
-    console.log('Getting current user in getSavedPhotoStripSessions');
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData?.user?.id;
-    console.log('Auth check for sessions:', userId ? `User ID: ${userId.substring(0, 8)}...` : 'Not authenticated');
-    
-    // Start building the query
-    let query = supabase
-      .from('sessions')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    // Apply user filtering if signed in
-    if (userId) {
-      // Only fetch sessions that belong to this user
-      console.log(`Filtering sessions for user: ${userId.substring(0, 8)}...`);
-      query = query.eq('user_id', userId);
-    } else {
-      console.log('No user signed in, showing anonymous sessions only');
-      // Only show sessions with null user_id (anonymous sessions)
-      query = query.is('user_id', null);
-    }
-    
-    // Apply date filtering if provided
-    if (dateFilter) {
-      const { year, month, day } = dateFilter;
+    if (!isServer) {
+      // On client side, make an API call
+      const params = new URLSearchParams()
+      params.append('limit', limit.toString())
+      if (dateFilter?.year) params.append('year', dateFilter.year.toString())
+      if (dateFilter?.month) params.append('month', dateFilter.month.toString())
+      if (dateFilter?.day) params.append('day', dateFilter.day.toString())
       
-      if (year && month && day) {
-        // Filter by specific date
-        const startDate = new Date(year, month - 1, day).toISOString();
-        const endDate = new Date(year, month - 1, day + 1).toISOString();
-        query = query.gte('created_at', startDate).lt('created_at', endDate);
-      } else if (year && month) {
-        // Filter by month
-        const startDate = new Date(year, month - 1, 1).toISOString();
-        const endDate = new Date(year, month, 1).toISOString();
-        query = query.gte('created_at', startDate).lt('created_at', endDate);
-      } else if (year) {
-        // Filter by year
-        const startDate = new Date(year, 0, 1).toISOString();
-        const endDate = new Date(year + 1, 0, 1).toISOString();
-        query = query.gte('created_at', startDate).lt('created_at', endDate);
-      }
-    }
-
-    console.log('Executing sessions query with limit:', limit);
-    // Apply limit
-    query = query.limit(limit);
-    
-    // Execute query
-    const { data, error } = await query;
-    
-    if (error) {
-      console.error('Error fetching sessions:', error);
-      return [];
-    }
-
-    console.log(`Query returned ${data.length} sessions`);
-    
-    // For debugging purposes, log the first session if available
-    if (data.length > 0) {
-      const firstSession = { ...data[0] };
-      if (firstSession.photo_urls) {
-        // Don't log all the URLs
-        firstSession.photo_urls = '[URLs hidden]';
-      }
-      console.log('First session:', firstSession);
+      const response = await fetch(`/api/sessions?${params}`)
+      return await response.json()
     }
     
-    // Process the results to handle photo_urls that might be strings
-    const processedData = data.map((session: SessionRecord) => {
-      // Make sure photo_urls is an array
-      let photoUrls: string[] = [];
-      if (typeof session.photo_urls === 'string') {
-        try {
-          photoUrls = JSON.parse(session.photo_urls);
-        } catch (e) {
-          console.error('Error parsing photo_urls:', e);
+    const dbPool = getPool()
+    if (!dbPool) {
+      throw new Error('Database pool not initialized')
+    }
+    
+    const client = await dbPool.connect()
+    
+    try {
+      let query = 'SELECT * FROM sessions ORDER BY created_at DESC LIMIT $1'
+      const params: any[] = [limit]
+      
+      // Apply date filtering if provided
+      if (dateFilter) {
+        const { year, month, day } = dateFilter
+        
+        if (year && month && day) {
+          // Filter by specific date
+          const startDate = new Date(year, month - 1, day).toISOString()
+          const endDate = new Date(year, month - 1, day + 1).toISOString()
+          query = 'SELECT * FROM sessions WHERE created_at >= $2 AND created_at < $3 ORDER BY created_at DESC LIMIT $1'
+          params.push(startDate, endDate)
+        } else if (year && month) {
+          // Filter by month
+          const startDate = new Date(year, month - 1, 1).toISOString()
+          const endDate = new Date(year, month, 1).toISOString()
+          query = 'SELECT * FROM sessions WHERE created_at >= $2 AND created_at < $3 ORDER BY created_at DESC LIMIT $1'
+          params.push(startDate, endDate)
+        } else if (year) {
+          // Filter by year
+          const startDate = new Date(year, 0, 1).toISOString()
+          const endDate = new Date(year + 1, 0, 1).toISOString()
+          query = 'SELECT * FROM sessions WHERE created_at >= $2 AND created_at < $3 ORDER BY created_at DESC LIMIT $1'
+          params.push(startDate, endDate)
         }
-      } else if (Array.isArray(session.photo_urls)) {
-        photoUrls = session.photo_urls;
       }
       
-      return {
-        ...session,
-        photo_urls: photoUrls
-      };
-    });
-    
-    return processedData;
+      const result = await client.query(query, params)
+      
+      console.log(`Query returned ${result.rows.length} sessions`)
+      
+      // Process the results
+      const processedData = result.rows.map((session: any) => {
+        // Make sure photo_urls is an array
+        let photoUrls: string[] = []
+        if (typeof session.photo_urls === 'string') {
+          try {
+            photoUrls = JSON.parse(session.photo_urls)
+          } catch (e) {
+            console.error('Error parsing photo_urls:', e)
+          }
+        } else if (Array.isArray(session.photo_urls)) {
+          photoUrls = session.photo_urls
+        }
+        
+        return {
+          ...session,
+          photo_urls: photoUrls
+        }
+      })
+      
+      return processedData
+    } finally {
+      client.release()
+    }
   } catch (error) {
-    console.error('Error in getSavedPhotoStripSessions:', error);
-    return [];
+    console.error('Error in getSavedPhotoStripSessions:', error)
+    return []
   }
 }
 
@@ -396,113 +313,57 @@ export const updateSessionMemoryNotes = async (
   caption?: string
 ): Promise<boolean> => {
   try {
-    // Get the current authenticated user
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData?.user?.id;
-
-    // First, check if this session belongs to the current user
-    const { data: sessionData, error: fetchError } = await supabase
-      .from('sessions')
-      .select('user_id')
-      .eq('id', sessionId)
-      .single();
-
-    if (fetchError) {
-      console.error('Error fetching session:', fetchError);
-      return false;
-    }
-
-    // If session has a user_id and it doesn't match the current user, deny access
-    if (sessionData.user_id && sessionData.user_id !== userId) {
-      console.error('Permission denied: Users can only modify their own sessions');
-      return false;
-    }
-
-    // Prepare update data
-    const updateData: { memory_notes: string; captions?: string } = {
-      memory_notes: memoryNotes
-    };
-    
-    // Add caption to update if provided
-    if (caption !== undefined) {
-      updateData.captions = caption;
+    if (!isServer) {
+      // On client side, make an API call
+      const response = await fetch(`/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memoryNotes, caption })
+      })
+      return response.ok
     }
     
-    // Update the session
-    const { error } = await supabase
-      .from('sessions')
-      .update(updateData)
-      .eq('id', sessionId);
-    
-    if (error) {
-      console.error('Error updating session memory notes:', error);
-      return false;
+    const dbPool = getPool()
+    if (!dbPool) {
+      throw new Error('Database pool not initialized')
     }
     
-    return true;
-  } catch (error) {
-    console.error('Exception in updateSessionMemoryNotes:', error);
-    return false;
-  }
-}
-
-// Helper function to debug auth state
-export const debugAuthState = async () => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: { session } } = await supabase.auth.getSession()
+    const client = await dbPool.connect()
     
-    console.log('Auth Debug:', {
-      hasUser: !!user,
-      hasSession: !!session,
-      userId: user?.id ? `${user.id.substring(0, 8)}...` : null,
-      email: user?.email ? `${user.email.split('@')[0]}@...` : null
-    })
-    
-    return { user, session }
-  } catch (error) {
-    console.error('Error debugging auth state:', error)
-    return { user: null, session: null }
-  }
-}
-
-// Debug function to get all sessions regardless of user (for admin only)
-export const getAllSessions = async (limit = 100) => {
-  try {
-    // First, check if the current user is an admin
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData?.user || userData.user.email !== 'mcikalmerdeka@gmail.com') {
-      console.error('Unauthorized access attempt to getAllSessions');
-      return []; // Return empty array for non-admin users
-    }
-    
-    console.log('ADMIN DEBUG: Fetching all sessions regardless of user');
-    
-    const { data, error } = await supabase
-      .from('sessions')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    try {
+      // Prepare update query
+      let query = 'UPDATE sessions SET memory_notes = $1'
+      const params: any[] = [memoryNotes]
       
-    if (error) {
-      console.error('Error fetching all sessions:', error);
-      return [];
+      if (caption !== undefined) {
+        query += ', captions = $2'
+        params.push(caption)
+      }
+      
+      query += ` WHERE id = $${params.length + 1}`
+      params.push(sessionId)
+      
+      await client.query(query, params)
+      
+      console.log('Successfully updated session:', sessionId)
+      return true
+    } finally {
+      client.release()
     }
-    
-    console.log(`Found ${data.length} total sessions in database`);
-    
-    // Group by user_id for analysis
-    const sessionsByUser: Record<string, number> = {};
-    for (const session of data) {
-      const userId = session.user_id || 'anonymous';
-      sessionsByUser[userId] = (sessionsByUser[userId] || 0) + 1;
-    }
-    
-    console.log('Sessions by user:', sessionsByUser);
-    
-    return data;
   } catch (error) {
-    console.error('Error in getAllSessions:', error);
-    return [];
+    console.error('Error in updateSessionMemoryNotes:', error)
+    return false
   }
-} 
+}
+
+// Helper function to debug auth state (now returns null since auth is removed)
+export const debugAuthState = async () => {
+  console.log('Auth not configured with Neon database')
+  return { user: null, session: null }
+}
+
+// Debug function to get all sessions (admin only)
+export const getAllSessions = async (limit = 100) => {
+  // Same as getSavedPhotoStripSessions without user filter
+  return getSavedPhotoStripSessions(limit)
+}

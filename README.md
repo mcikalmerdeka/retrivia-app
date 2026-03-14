@@ -12,15 +12,16 @@
 - Add memorial notes to preserve the feelings and context of each moment
 - Save and revisit your memories with a semantic search feature (coming soon)
 - Download high-quality photostrips with your memorial notes
-- Cloud storage for your photos and photostrips using Supabase
+- Save and download photostrips
+- Neon PostgreSQL database for data persistence
 
 ## Tech Stack
 
-- Next.js 15.2.0
+- Next.js 15.5.12
 - React 18.3.1
 - TypeScript
 - Tailwind CSS
-- Supabase (Storage and Database)
+- Neon (Serverless PostgreSQL)
 
 ## Getting Started
 
@@ -33,15 +34,14 @@ Or set up your local development environment:
    ```bash
    npm install
    ```
-3. Set up Supabase (see [docs/SUPABASE_SETUP.md](./docs/SUPABASE_SETUP.md) for detailed instructions)
+3. Set up Neon database (see [docs/MIGRATION_GUIDE.md](./docs/MIGRATION_GUIDE.md) for detailed instructions)
 4. Copy `.env.example` to `.env.local` and configure your environment variables:
    ```bash
    cp .env.example .env.local
    ```
-5. Update `.env.local` with your Supabase credentials:
+5. Update `.env.local` with your Neon database URL:
    ```
-   NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+   DATABASE_URL=postgresql://user:password@host/database?sslmode=require
    ```
 6. Run the development server:
    ```bash
@@ -63,23 +63,28 @@ Retrivia/
 ├── .git/                   # Git repository
 ├── .next/                  # Next.js build output
 ├── docs/                   # Documentation
-│   ├── SUPABASE_SETUP.md   # Supabase setup instructions
-│   └── SUPABASE_TESTING.md # Troubleshooting guide
+│   ├── MIGRATION_GUIDE.md  # Migration guide
+│   ├── NEON_SETUP.sql      # Neon database schema
+│   ├── SUPABASE_SETUP.md   # (Legacy) Supabase setup
+│   └── SUPABASE_TESTING.md # (Legacy) Troubleshooting
 ├── node_modules/           # Dependencies
 ├── src/                    # Source code
 │   ├── app/                # Next.js app router pages
+│   │   ├── api/            # API routes
+│   │   │   ├── sessions/   # Sessions API
+│   │   │   └── test-db/    # Database test API
 │   │   ├── page.tsx        # Home page
 │   │   ├── photobooth/     # Photobooth page
 │   │   ├── photobook/      # Memory album page
 │   │   └── upload/         # Upload page
 │   ├── components/         # React components
-│   │   ├── auth/           # Authentication components
+│   │   ├── auth/           # Authentication components (disabled)
 │   │   ├── photobooth/     # Photobooth-specific components
 │   │   └── upload/         # Upload-specific components
 │   ├── contexts/           # React contexts
-│   │   └── AuthContext.tsx # Authentication context
+│   │   └── AuthContext.tsx # Auth context (disabled)
 │   ├── lib/                # Utility functions
-│   │   ├── supabase.ts     # Supabase client and utilities
+│   │   ├── supabase.ts     # Database client (Neon)
 │   │   └── utils/          # Utility functions
 │   └── types/              # TypeScript type definitions
 ├── .env.example            # Environment variables template

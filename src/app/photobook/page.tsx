@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { ChevronLeft, Calendar, Camera, Upload, RotateCcw } from 'lucide-react'
-import { getSavedPhotoStripSessions, updateSessionMemoryNotes, getAllSessions, debugAuthState } from '@/lib/supabase'
+
+import { Camera, Upload, RotateCcw } from 'lucide-react'
+import { getSavedPhotoStripSessions, updateSessionMemoryNotes } from '@/lib/supabase'
 import Link from 'next/link'
 
 // Session type definition
@@ -17,7 +17,6 @@ interface PhotoSession {
 }
 
 export default function PhotobookPage() {
-  const router = useRouter();
   const [sessions, setSessions] = useState<PhotoSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<PhotoSession | null>(null);
@@ -34,27 +33,11 @@ export default function PhotobookPage() {
   const [availableMonths, setAvailableMonths] = useState<number[]>([]);
   const [availableDays, setAvailableDays] = useState<number[]>([]);
 
-  const [debugMode, setDebugMode] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  // Admin mode is disabled since auth has been removed
+  const [isAdmin] = useState(true); // Everyone is "admin" now (no auth required)
 
   useEffect(() => {
-    // Initial load of sessions
-    const loadWithDebug = async () => {
-      const { debugAuthState } = await import('@/lib/supabase');
-      const { user } = await debugAuthState();
-      
-      // Check if user is admin
-      if (user?.email === 'mcikalmerdeka@gmail.com') {
-        console.log('Admin user detected');
-        setIsAdmin(true);
-      } else {
-        setIsAdmin(false);
-      }
-      
-      fetchSessions();
-    };
-    
-    loadWithDebug();
+    fetchSessions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -191,31 +174,10 @@ export default function PhotobookPage() {
     });
   };
 
-  // Add a debug function
+  // Refresh function to reload sessions
   const runDebugCheck = async () => {
-    // Only run for admin user
-    if (!isAdmin) {
-      console.log('Debug mode is only available for admin users');
-      return;
-    }
-    
-    console.log('Running debug checks...');
-    
-    // Check auth state
-    await debugAuthState();
-    
-    // Attempt to fetch all sessions as a sanity check
-    const allSessions = await getAllSessions();
-    
-    if (allSessions.length > 0) {
-      console.log(`Debug found ${allSessions.length} total sessions`);
-      
-      // Toggle debug mode to show all sessions temporarily
-      setDebugMode(true);
-      setSessions(allSessions);
-    } else {
-      console.log('No sessions found at all in the database');
-    }
+    console.log('Refreshing sessions...');
+    await fetchSessions();
   };
 
   return (
@@ -231,35 +193,16 @@ export default function PhotobookPage() {
             <Upload size={16} />
             Upload Photos
           </Link>
-          {/* Debug button - only visible to admin */}
-          {isAdmin && (
-            <button 
-              onClick={runDebugCheck}
-              className="vintage-button flex items-center gap-2 opacity-50 hover:opacity-100"
-              title="Troubleshoot album"
-            >
-              <RotateCcw size={16} />
-              Refresh
-            </button>
-          )}
-        </div>
-      </div>
-      
-      {debugMode && isAdmin && (
-        <div className="mb-4 p-2 bg-yellow-100 border border-yellow-600 rounded text-sm">
-          <p className="font-semibold text-yellow-800">Debug Mode: Showing all sessions</p>
-          <p>This is temporary to help troubleshoot the empty album issue.</p>
           <button 
-            onClick={() => {
-              setDebugMode(false);
-              fetchSessions();
-            }}
-            className="px-2 py-1 bg-yellow-200 hover:bg-yellow-300 text-yellow-800 rounded mt-1"
+            onClick={runDebugCheck}
+            className="vintage-button flex items-center gap-2 opacity-50 hover:opacity-100"
+            title="Refresh album"
           >
-            Return to normal view
+            <RotateCcw size={16} />
+            Refresh
           </button>
         </div>
-      )}
+      </div>
       
       {sessions.length > 0 ? (
         <div className="mb-4 flex flex-wrap gap-2">
