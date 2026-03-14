@@ -33,19 +33,21 @@ Or set up your local development environment:
    ```bash
    npm install
    ```
-3. Set up Supabase (see [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) for detailed instructions)
-4. Configure environment variables in `.env`:
+3. Set up Supabase (see [docs/SUPABASE_SETUP.md](./docs/SUPABASE_SETUP.md) for detailed instructions)
+4. Copy `.env.example` to `.env.local` and configure your environment variables:
+   ```bash
+   cp .env.example .env.local
    ```
-   NEXT_PUBLIC_APP_URL=http://localhost:3000
-   NEXT_PUBLIC_MAX_PHOTO_SIZE=5242880 # 5MB in bytes
+5. Update `.env.local` with your Supabase credentials:
+   ```
    NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
    ```
-5. Run the development server:
+6. Run the development server:
    ```bash
    npm run dev
    ```
-6. Open [http://localhost:3000](http://localhost:3000) in your browser
+7. Open [http://localhost:3000](http://localhost:3000) in your browser
 
 ## Development
 
@@ -60,34 +62,31 @@ Or set up your local development environment:
 Retrivia/
 ├── .git/                   # Git repository
 ├── .next/                  # Next.js build output
+├── docs/                   # Documentation
+│   ├── SUPABASE_SETUP.md   # Supabase setup instructions
+│   └── SUPABASE_TESTING.md # Troubleshooting guide
 ├── node_modules/           # Dependencies
 ├── src/                    # Source code
 │   ├── app/                # Next.js app router pages
 │   │   ├── page.tsx        # Home page
 │   │   ├── photobooth/     # Photobooth page
+│   │   ├── photobook/      # Memory album page
 │   │   └── upload/         # Upload page
 │   ├── components/         # React components
+│   │   ├── auth/           # Authentication components
 │   │   ├── photobooth/     # Photobooth-specific components
-│   │   │   ├── CaptionComponent.tsx
-│   │   │   ├── FilterComponent.tsx
-│   │   │   ├── FrameComponent.tsx
-│   │   │   ├── PhotoboothComponent.tsx
-│   │   │   ├── PhotoStripComponent.tsx
-│   │   │   └── UploadComponent.tsx
-│   │   ├── upload/         # Upload-specific components
-│   │   │   └── UploadComponent.tsx
-│   │   └── ui/             # Shared UI components
+│   │   └── upload/         # Upload-specific components
+│   ├── contexts/           # React contexts
+│   │   └── AuthContext.tsx # Authentication context
 │   ├── lib/                # Utility functions
 │   │   ├── supabase.ts     # Supabase client and utilities
 │   │   └── utils/          # Utility functions
-│   │       └── photo.ts    # Photo manipulation utilities
 │   └── types/              # TypeScript type definitions
-├── .env                    # Environment variables
+├── .env.example            # Environment variables template
 ├── .eslintrc.json          # ESLint configuration
 ├── next.config.js          # Next.js configuration
 ├── package.json            # Dependencies and scripts
 ├── postcss.config.js       # PostCSS configuration
-├── SUPABASE_SETUP.md       # Supabase setup instructions
 ├── tailwind.config.js      # Tailwind CSS configuration
 └── tsconfig.json           # TypeScript configuration
 ```
