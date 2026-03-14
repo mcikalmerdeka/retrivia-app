@@ -18,6 +18,41 @@ if (isBrowser) {
   }
 }
 
+// Create a custom storage wrapper to handle JSON parse errors
+const createSafeStorage = () => {
+  if (!isBrowser) return undefined
+  
+  return {
+    getItem: (key: string) => {
+      try {
+        const item = localStorage.getItem(key)
+        if (!item) return null
+        // Validate JSON before returning
+        JSON.parse(item)
+        return item
+      } catch (e) {
+        console.warn(`Failed to parse localStorage key "${key}", removing corrupted data`)
+        localStorage.removeItem(key)
+        return null
+      }
+    },
+    setItem: (key: string, value: string) => {
+      try {
+        localStorage.setItem(key, value)
+      } catch (e) {
+        console.error(`Failed to set localStorage key "${key}":`, e)
+      }
+    },
+    removeItem: (key: string) => {
+      try {
+        localStorage.removeItem(key)
+      } catch (e) {
+        console.error(`Failed to remove localStorage key "${key}":`, e)
+      }
+    }
+  }
+}
+
 // Create a single supabase client for the entire app
 export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -27,7 +62,7 @@ export const supabase = createClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      storage: isBrowser ? localStorage : undefined
+      storage: createSafeStorage()
     }
   }
 )
