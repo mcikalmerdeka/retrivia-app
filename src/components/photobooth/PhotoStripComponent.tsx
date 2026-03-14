@@ -133,7 +133,9 @@ const PhotoStripComponent = forwardRef<HTMLCanvasElement, PhotoStripComponentPro
     const frameStyle = getFrameStyle(frame)
     const filteredPhotos = photos.filter(photo => photo !== null)
 
-    const photoWidth = canvas.width * 0.85
+    // Use fixed dimensions instead of depending on canvas.width
+    const baseWidth = 450
+    const photoWidth = baseWidth * 0.85
     const photoHeight = photoWidth * 0.6
     const gap = 10
     const bottomSpace = caption ? 60 : 20
